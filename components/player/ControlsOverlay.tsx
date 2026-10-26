@@ -7,6 +7,9 @@ import {
   Pause,
   RotateCcw,
   RotateCw,
+  FlipHorizontal,
+  FlipVertical,
+  RefreshCw,
   Volume2,
   Volume1,
   VolumeX,
@@ -33,6 +36,7 @@ import {
   Check,
 } from 'lucide-react';
 import { formatTime, formatVideoTitle } from '@/lib/utils/formatters';
+import { type VideoOrientation } from '@/lib/player/orientation';
 import { VideoFitMode, PlayerProfile } from '@/lib/storage/db';
 import { LoopMode, ABRepeatState } from '@/context/MediaSessionContext';
 
@@ -90,6 +94,13 @@ interface ControlsOverlayProps {
   onChangeSpeed: (speed: number) => void;
   onChangeFitMode: (mode: VideoFitMode) => void;
   onToggleLoop: () => void;
+  orientation: VideoOrientation;
+  onRotateClockwise: () => void;
+  onRotateCounterClockwise: () => void;
+  onRotate180: () => void;
+  onFlipHorizontal: () => void;
+  onFlipVertical: () => void;
+  onResetOrientation: () => void;
   onPrevTrack: () => void;
   onNextTrack: () => void;
   onOpenSubtitles: () => void;
@@ -180,6 +191,13 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   onChangeSpeed,
   onChangeFitMode,
   onToggleLoop,
+  orientation,
+  onRotateClockwise,
+  onRotateCounterClockwise,
+  onRotate180,
+  onFlipHorizontal,
+  onFlipVertical,
+  onResetOrientation,
   onPrevTrack,
   onNextTrack,
   onOpenSubtitles,
@@ -187,6 +205,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   onOpenShortcuts,
 }) => {
   const [hoverTime, setHoverTime] = useState<number | null>(null);
+  const [orientationMenuOpen, setOrientationMenuOpen] = useState(false);
   const [hoverPosition, setHoverPosition] = useState<number>(0);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showFitMenu, setShowFitMenu] = useState(false);
@@ -332,6 +351,52 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
               <Repeat className={`w-4 h-4 ${loopMode === 'all' ? 'text-[var(--bv)]' : 'text-slate-400'}`} />
             )}
           </button>
+
+          {/* Orientation: rotate & flip popover (purely visual) */}
+          <div className="relative">
+            <button
+              onClick={() => setOrientationMenuOpen((v) => !v)}
+              title="Rotate & flip"
+              aria-label="Rotate and flip options"
+              aria-expanded={orientationMenuOpen}
+              className={`rnd gl text-white hover:border-[var(--bv)] ${orientation.rotate !== 0 || orientation.flipH || orientation.flipV ? 'border-[var(--cy)]' : ''}`}
+            >
+              <RefreshCw className={`w-4 h-4 ${orientation.rotate !== 0 ? 'text-[var(--cy)]' : 'text-slate-400'}`} />
+            </button>
+            {orientationMenuOpen && (
+              <div
+                className="absolute top-12 right-0 z-20 w-52 rounded-2xl border border-[var(--bd)] bg-[var(--es)]/95 backdrop-blur-xl p-2 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <p className="px-2 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--t3)]">
+                  Rotate &amp; flip (visual only)
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button onClick={onRotateCounterClockwise} className="chip gl text-white text-[11px] h-9 px-2 justify-center" title="Rotate counter-clockwise 90°">
+                    <RotateCcw className="w-3.5 h-3.5" /> CCW 90°
+                  </button>
+                  <button onClick={onRotateClockwise} className="chip gl text-white text-[11px] h-9 px-2 justify-center" title="Rotate clockwise 90°">
+                    <RotateCw className="w-3.5 h-3.5" /> CW 90°
+                  </button>
+                  <button onClick={onRotate180} className="chip gl text-white text-[11px] h-9 px-2 justify-center" title="Rotate 180°">
+                    <RotateCw className="w-3.5 h-3.5" /> 180°
+                  </button>
+                  <button onClick={onFlipHorizontal} className={`chip gl text-[11px] h-9 px-2 justify-center ${orientation.flipH ? 'text-[var(--cy)] border-[var(--cy)]' : 'text-white'}`} title="Flip horizontally">
+                    <FlipHorizontal className="w-3.5 h-3.5" /> Flip H
+                  </button>
+                  <button onClick={onFlipVertical} className={`chip gl text-[11px] h-9 px-2 justify-center ${orientation.flipV ? 'text-[var(--cy)] border-[var(--cy)]' : 'text-white'}`} title="Flip vertically">
+                    <FlipVertical className="w-3.5 h-3.5" /> Flip V
+                  </button>
+                  <button onClick={onResetOrientation} className="chip gl text-white text-[11px] h-9 px-2 justify-center" title="Reset orientation">
+                    Reset
+                  </button>
+                </div>
+                <p className="px-2 pt-2 pb-1 text-[10px] leading-relaxed text-[var(--t3)]">
+                  Playback, subtitles and zoom are not affected. Screen orientation is not forced.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Favorite Toggle */}
           <button

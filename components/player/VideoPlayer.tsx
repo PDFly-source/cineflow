@@ -11,6 +11,18 @@ import { PlaylistDrawer } from './PlaylistDrawer';
 import { ShortcutsModal } from './ShortcutsModal';
 import { PlaybackDiagnosticsModal } from '@/components/diagnostics/PlaybackDiagnosticsModal';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
+import {
+  DEFAULT_ORIENTATION,
+  rotateClockwise,
+  rotateCounterClockwise,
+  rotate180,
+  flipHorizontal,
+  flipVertical,
+  resetOrientation as resetOrientationState,
+  composeTransform,
+  rotationFitScale,
+  type VideoOrientation,
+} from '@/lib/player/orientation';
 import { useMediaSession } from '@/hooks/use-media-session';
 import { Loader2, AlertCircle, FolderOpen, Film, Play, Sparkles, Activity } from 'lucide-react';
 import { VideoFitMode } from '@/lib/storage/db';
@@ -70,6 +82,10 @@ export const VideoPlayer: React.FC = () => {
   // In-player brightness (40% to 160%)
   const [brightness, setBrightness] = useState<number>(100);
   const [zoomScale, setZoomScale] = useState<number>(1.0);
+  // Visual orientation (rotation/flips) - playback state is untouched.
+  const [orientation, setOrientation] = useState<VideoOrientation>(DEFAULT_ORIENTATION);
+  const [videoNaturalSize, setVideoNaturalSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const [containerSize, setContainerSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
   // Fullscreen & PiP
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -140,6 +156,28 @@ export const VideoPlayer: React.FC = () => {
         });
     }
   }, [currentItem]);
+
+  // Reset orientation when the media changes (new file -> upright view)
+  useEffect(() => {
+    setOrientation(DEFAULT_ORIENTATION);
+  }, [currentItem?.objectUrl]);
+
+  // Track container size so rotated video bounds can be computed without clipping.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const measure = () => {
+      setContainerSize({ w: container.clientWidth, h: container.clientHeight });
+    };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(container);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
 
   // Update loop attribute on video
   useEffect(() => {
@@ -398,6 +436,7 @@ export const VideoPlayer: React.FC = () => {
     const video = videoRef.current;
     if (!video) return;
     setDuration(video.duration || 0);
+    setVideoNaturalSize({ w: video.videoWidth || 0, h: video.videoHeight || 0 });
     setPlaybackError(null);
     setIsBuffering(false);
   };
@@ -574,7 +613,10 @@ export const VideoPlayer: React.FC = () => {
             playerProfile === 'bedtime'
               ? `brightness(${Math.min(brightness, 85)}%) sepia(0.22) saturate(0.85)`
               : `brightness(${brightness}%)`,
-          transform: zoomScale !== 1.0 ? `scale(${zoomScale})` : undefined,
+          transform: composeTransform(
+            orientation,
+            zoomScale * rotationFitScale(videoNaturalSize.w, videoNaturalSize.h, containerSize.w, containerSize.h, orientation)
+          ),
           transformOrigin: 'center center',
           ...fit.style,
         }}
@@ -761,6 +803,13 @@ export const VideoPlayer: React.FC = () => {
         onChangeSpeed={setPlaybackSpeed}
         onChangeFitMode={setFitMode}
         onToggleLoop={toggleLoop}
+        orientation={orientation}
+        onRotateClockwise={() => setOrientation((o) => rotateClockwise(o))}
+        onRotateCounterClockwise={() => setOrientation((o) => rotateCounterClockwise(o))}
+        onRotate180={() => setOrientation((o) => rotate180(o))}
+        onFlipHorizontal={() => setOrientation((o) => flipHorizontal(o))}
+        onFlipVertical={() => setOrientation((o) => flipVertical(o))}
+        onResetOrientation={() => setOrientation(resetOrientationState())}
         onPrevTrack={prevTrack}
         onNextTrack={nextTrack}
         onOpenSubtitles={() => setShowSubtitlesModal(true)}
