@@ -24,6 +24,7 @@ import { BrandHeader } from '@/components/brand/Logo';
 import { EmptyStateCard } from '@/components/ui/EmptyStateCard';
 import { VideoLibraryItem } from '@/components/library/VideoLibraryItem';
 import { VideoActionSheet } from '@/components/library/VideoActionSheet';
+import { Mp3ConverterModal } from '@/components/library/Mp3ConverterModal';
 import { updatePlaybackRecordFields, type PlaybackRecord } from '@/lib/storage/db';
 
 export default function LibraryPage() {
@@ -35,6 +36,7 @@ export default function LibraryPage() {
   const [activeTab, setActiveTab] = useState<'recent' | 'favorites' | 'playlists' | 'sort'>('recent');
   const [sortOrder, setSortOrder] = useState<'recent' | 'name' | 'duration'>('recent');
   const [sheetRecord, setSheetRecord] = useState<PlaybackRecord | null>(null);
+  const [mp3RecordHint, setMp3RecordHint] = useState<{ fileName: string; fileSize: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -257,11 +259,9 @@ export default function LibraryPage() {
           record={sheetRecord}
           onClose={() => setSheetRecord(null)}
           onRecordChanged={handleRecordChanged}
-          onConvertToMp3={() => {
+          onConvertToMp3={(r) => {
             setSheetRecord(null);
-            setNotice(
-              'Video to MP3 needs the original file. CineFlow never stores copies, so the converter will ask you to re-select the video from your device. The converter screen is being finalized in this update phase.'
-            );
+            setMp3RecordHint({ fileName: r.fileName, fileSize: r.fileSize });
           }}
           onTransfer={() => {
             setSheetRecord(null);
@@ -270,6 +270,11 @@ export default function LibraryPage() {
             );
           }}
         />
+      )}
+
+      {/* Video to MP3 converter */}
+      {mp3RecordHint && (
+        <Mp3ConverterModal recordHint={mp3RecordHint} onClose={() => setMp3RecordHint(null)} />
       )}
     </div>
   );
