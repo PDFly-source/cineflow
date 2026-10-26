@@ -4,10 +4,10 @@
  */
 /**
  * Duration of the generated clip. Must comfortably exceed the player's default
- * controls auto-hide delay (3.5s) so uninterrupted playback can be verified
- * and users can exercise gestures on a real timeline.
+ * controls auto-hide delay (3.5s) so uninterrupted playback can be verified,
+ * and stay long enough for users to practice seek/brightness/volume gestures.
  */
-export const TEST_CLIP_DURATION_SECONDS = 8;
+export const TEST_CLIP_DURATION_SECONDS = 15;
 
 export async function generateTestClipFile(): Promise<File | null> {
   if (typeof window === 'undefined' || typeof MediaRecorder === 'undefined') {
