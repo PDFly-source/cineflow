@@ -1,18 +1,19 @@
-const CACHE_NAME = 'cineflow-shell-v1';
+const BASE_PATH = '/cineflow';
+const CACHE_NAME = 'cineflow-shell-v2';
 const PRECACHE_ASSETS = [
-  '/',
-  '/player',
-  '/library',
-  '/playlists',
-  '/settings',
-  '/privacy',
-  '/offline.html',
-  '/manifest.json',
-  '/icon.svg',
-  '/pwa-192x192.png',
-  '/pwa-512x512.png',
-  '/apple-touch-icon.png',
-  '/favicon.ico'
+  `${BASE_PATH}/`,
+  `${BASE_PATH}/player/`,
+  `${BASE_PATH}/library/`,
+  `${BASE_PATH}/playlists/`,
+  `${BASE_PATH}/settings/`,
+  `${BASE_PATH}/privacy/`,
+  `${BASE_PATH}/offline.html`,
+  `${BASE_PATH}/manifest.json`,
+  `${BASE_PATH}/icon.svg`,
+  `${BASE_PATH}/pwa-192x192.png`,
+  `${BASE_PATH}/pwa-512x512.png`,
+  `${BASE_PATH}/apple-touch-icon.png`,
+  `${BASE_PATH}/favicon.ico`
 ];
 
 self.addEventListener('install', (event) => {
@@ -67,7 +68,7 @@ self.addEventListener('fetch', (event) => {
         .catch(async () => {
           const cached = await caches.match(event.request);
           if (cached) return cached;
-          const fallback = await caches.match('/offline.html');
+          const fallback = await caches.match(`${BASE_PATH}/offline.html`);
           return fallback || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
         })
     );

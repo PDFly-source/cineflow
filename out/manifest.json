@@ -1,0 +1,32 @@
+{
+  "id": "/cineflow/",
+  "name": "CineFlow - Private Local Video Player",
+  "short_name": "CineFlow",
+  "description": "Privacy-first, browser-native cinematic video player with offline capability and zero cloud uploads.",
+  "start_url": "/cineflow/",
+  "scope": "/cineflow/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0d14",
+  "theme_color": "#0a0d14",
+  "icons": [
+    {
+      "src": "/cineflow/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/cineflow/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/cineflow/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

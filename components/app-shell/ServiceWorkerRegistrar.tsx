@@ -19,8 +19,10 @@ export const ServiceWorkerRegistrar: React.FC = () => {
 
     // Register Service Worker in production
     if ('serviceWorker' in navigator && process.env.NODE_ENV !== 'development') {
+      // GitHub Pages deploys under a base path (/cineflow) — resolve the SW scope-relative.
+      const swPath = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/sw.js`;
       navigator.serviceWorker
-        .register('/sw.js')
+        .register(swPath, { scope: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/` })
         .then((reg) => {
           reg.onupdatefound = () => {
             const installing = reg.installing;

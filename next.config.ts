@@ -1,5 +1,9 @@
 import type {NextConfig} from 'next';
 
+// Base path for GitHub Pages project-site deployment:
+// https://pdfly-source.github.io/cineflow/
+const BASE_PATH = '/cineflow';
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   eslint: {
@@ -8,8 +12,17 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Allow access to remote image placeholder.
+  // GitHub Pages serves static files only — export a fully static site.
+  output: 'export',
+  basePath: BASE_PATH,
+  trailingSlash: true,
+  // Exposed to client code (e.g. service-worker registration path).
+  env: {
+    NEXT_PUBLIC_BASE_PATH: BASE_PATH,
+  },
+  // Static export cannot use the Next.js image optimization server.
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -19,7 +32,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  output: 'standalone',
   transpilePackages: ['motion'],
   webpack: (config, {dev}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.

@@ -53,7 +53,7 @@ export const VolumeIndicator: React.FC<VolumeIndicatorProps> = ({ state }) => {
         </div>
 
         {/* OS Restriction Warning (e.g., iOS Safari) */}
-        {state.osRestricted && (
+        {state.isProgrammaticDisabled && (
           <div className="flex items-center gap-1 mt-1 text-[9px] text-[var(--wa)] leading-tight bg-[var(--ss)] p-1 rounded-md">
             <AlertCircle className="w-2.5 h-2.5 shrink-0" />
             <span>Use hardware buttons on this device</span>
