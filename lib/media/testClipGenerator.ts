@@ -73,7 +73,7 @@ export async function generateTestClipFile(): Promise<File | null> {
       recorder.start();
 
       let frame = 0;
-      const totalFrames = 30 * TEST_CLIP_DURATION_SECONDS;
+      const totalFrames = 30 * TEST_CLIP_DURATION_SECONDS; // visual progress denominator (duration is enforced by elapsed time)
       const startTime = Date.now();
 
       const draw = () => {
@@ -123,7 +123,7 @@ export async function generateTestClipFile(): Promise<File | null> {
         ctx.fillText(`TIME: ${elapsed.toFixed(2)}s · RESOLUTION: ${width}x${height} · 30 FPS`, width / 2, 90);
 
         // Status countdown
-        const remaining = Math.max(0, 4 - elapsed).toFixed(1);
+        const remaining = Math.max(0, TEST_CLIP_DURATION_SECONDS - elapsed).toFixed(1);
         ctx.fillStyle = '#38bdf8';
         ctx.font = 'bold 15px monospace';
         ctx.fillText(`TEST DURATION: ${remaining}s`, width / 2, height - 50);
@@ -135,7 +135,10 @@ export async function generateTestClipFile(): Promise<File | null> {
         ctx.fillRect(40, height - 25, (width - 80) * progress, 6);
 
         frame++;
-        if (frame < totalFrames && recorder.state === 'recording') {
+        // End on real elapsed time: rAF frame rate varies wildly across
+        // browsers/devices, so a frame-count cutoff yields unpredictable
+        // (often far shorter) clips.
+        if (elapsed < TEST_CLIP_DURATION_SECONDS && recorder.state === 'recording') {
           requestAnimationFrame(draw);
         } else {
           try {
