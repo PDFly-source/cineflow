@@ -311,6 +311,28 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
             )}
           </button>
 
+          {/* Loop Toggle: none -> one -> all */}
+          <button
+            onClick={onToggleLoop}
+            title={
+              loopMode === 'one'
+                ? 'Loop: this video'
+                : loopMode === 'all'
+                ? 'Loop: whole queue'
+                : 'Loop: off'
+            }
+            aria-label={`Loop mode: ${
+              loopMode === 'one' ? 'this video' : loopMode === 'all' ? 'whole queue' : 'off'
+            }`}
+            className="rnd gl text-white hover:border-[var(--bv)]"
+          >
+            {loopMode === 'one' ? (
+              <Repeat1 className="w-4 h-4 text-[var(--cy)]" />
+            ) : (
+              <Repeat className={`w-4 h-4 ${loopMode === 'all' ? 'text-[var(--bv)]' : 'text-slate-400'}`} />
+            )}
+          </button>
+
           {/* Favorite Toggle */}
           <button
             onClick={onToggleFavorite}

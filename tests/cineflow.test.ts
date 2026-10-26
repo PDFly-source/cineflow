@@ -157,3 +157,14 @@ test('Diagnostics: runs server-side fallback cleanly without throwing', async ()
   assert.ok(Array.isArray(report.systemCapabilities));
 });
 
+
+// Regression: the generated test clip must play long enough (uninterrupted) to
+// pass the controls auto-hide delay, otherwise auto-hide can never be observed.
+test('Test clip duration exceeds the controls auto-hide delay', async () => {
+  const { TEST_CLIP_DURATION_SECONDS } = await import('../lib/media/testClipGenerator.ts');
+  const { DEFAULT_SETTINGS } = await import('../lib/storage/db.ts');
+  assert.ok(
+    TEST_CLIP_DURATION_SECONDS * 1000 > DEFAULT_SETTINGS.autoHideDelay + 2000,
+    `Test clip (${TEST_CLIP_DURATION_SECONDS}s) should exceed the auto-hide delay (${DEFAULT_SETTINGS.autoHideDelay}ms) by at least 2s`
+  );
+});

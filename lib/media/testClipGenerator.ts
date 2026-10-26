@@ -2,6 +2,13 @@
  * Generates an authentic local WebM video file directly inside the browser using Canvas & MediaRecorder.
  * No network requests, zero downloads, 100% client-side generated.
  */
+/**
+ * Duration of the generated clip. Must comfortably exceed the player's default
+ * controls auto-hide delay (3.5s) so uninterrupted playback can be verified
+ * and users can exercise gestures on a real timeline.
+ */
+export const TEST_CLIP_DURATION_SECONDS = 8;
+
 export async function generateTestClipFile(): Promise<File | null> {
   if (typeof window === 'undefined' || typeof MediaRecorder === 'undefined') {
     return null;
@@ -66,7 +73,7 @@ export async function generateTestClipFile(): Promise<File | null> {
       recorder.start();
 
       let frame = 0;
-      const totalFrames = 30 * 4; // 4 seconds
+      const totalFrames = 30 * TEST_CLIP_DURATION_SECONDS;
       const startTime = Date.now();
 
       const draw = () => {
