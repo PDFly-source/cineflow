@@ -8,3 +8,4 @@ coverage/
 
 # next.js static export output
 out
+tsconfig.tsbuildinfo
