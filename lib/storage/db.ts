@@ -11,6 +11,26 @@ export interface PlaybackRecord {
   subtitleName?: string;
   subtitleOffset?: number;
   isFavorite?: boolean;
+  // ---- v2 fields (optional, backward compatible with v1 records) ----
+  /** User-defined local title. The physical file name is never modified. */
+  displayName?: string;
+  /** Hidden from the Library list. The underlying file is untouched. */
+  hidden?: boolean;
+  /** Metadata cached from a real load. Never proof the file is still available. */
+  mediaInfo?: CachedMediaInfo;
+}
+
+/** Metadata captured when a media file is actually loaded in the player. */
+export interface CachedMediaInfo {
+  width?: number;
+  height?: number;
+  aspectRatio?: number;
+  /** MIME type reported by the browser for the loaded file. */
+  mimeType?: string;
+  /** Container inferred from the file extension. */
+  container?: string;
+  /** Epoch ms when this metadata was captured from a real load. */
+  capturedAt: number;
 }
 
 export interface PlaylistItemRef {
@@ -108,8 +128,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   confirmBeforeClearing: true,
 };
 
-const DB_NAME = 'cineflow_db';
-const DB_VERSION = 1;
+export const DB_NAME = 'cineflow_db';
+const DB_VERSION = 2;
 const STORES = {
   HISTORY: 'playback_history',
   PLAYLISTS: 'playlists',
@@ -129,13 +149,21 @@ const memoryFallback = {
   settings: { ...DEFAULT_SETTINGS },
 };
 
+function getIndexedDB(): IDBFactory | null {
+  if (typeof window !== 'undefined' && window.indexedDB) return window.indexedDB;
+  // Test environment (e.g. fake-indexeddb) or non-DOM runtime with a global factory.
+  const globalFactory = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
+  return globalFactory ?? null;
+}
+
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined' || !window.indexedDB) {
+    const factory = getIndexedDB();
+    if (!factory) {
       return reject(new Error('IndexedDB not supported'));
     }
 
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    const request = factory.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
@@ -158,11 +186,39 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORES.SETTINGS)) {
         db.createObjectStore(STORES.SETTINGS, { keyPath: 'id' });
       }
+
+      // ---- v1 -> v2 migration ----
+      // Existing stores/records are preserved untouched. We only add indexes
+      // for the new optional fields; v1 records simply read as
+      // displayName === undefined, hidden === undefined, mediaInfo === undefined.
+      const upgradeRequest = event.target as IDBOpenDBRequest;
+      const histV2 = db.objectStoreNames.contains(STORES.HISTORY)
+        ? upgradeRequest.transaction?.objectStore(STORES.HISTORY)
+        : undefined;
+      if (histV2) {
+        if (!histV2.indexNames.contains('isFavorite')) {
+          histV2.createIndex('isFavorite', 'isFavorite', { unique: false });
+        }
+        if (!histV2.indexNames.contains('hidden')) {
+          histV2.createIndex('hidden', 'hidden', { unique: false });
+        }
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error('Failed to open IndexedDB'));
   });
+}
+
+/**
+ * Closes the connection once the transaction settles, preventing leaked
+ * open connections (important for browser hygiene and for tests that
+ * delete/recreate the database between cases).
+ */
+function closeOnComplete(db: IDBDatabase, tx: IDBTransaction): void {
+  const done = () => { try { db.close(); } catch { /* already closed */ } };
+  tx.oncomplete = done;
+  tx.onabort = done;
 }
 
 // ================= HISTORY OPERATIONS =================
@@ -172,6 +228,7 @@ export async function savePlaybackRecord(record: PlaybackRecord): Promise<void> 
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.HISTORY, 'readwrite');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.HISTORY);
       const req = store.put(record);
       req.onsuccess = () => resolve();
@@ -192,6 +249,7 @@ export async function getPlaybackRecord(mediaKey: string): Promise<PlaybackRecor
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.HISTORY, 'readonly');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.HISTORY);
       const req = store.get(mediaKey);
       req.onsuccess = () => resolve(req.result || null);
@@ -214,6 +272,7 @@ export async function getAllPlaybackRecords(): Promise<PlaybackRecord[]> {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.HISTORY, 'readonly');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.HISTORY);
       const req = store.getAll();
       req.onsuccess = () => {
@@ -235,6 +294,7 @@ export async function deletePlaybackRecord(mediaKey: string): Promise<void> {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.HISTORY, 'readwrite');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.HISTORY);
       const req = store.delete(mediaKey);
       req.onsuccess = () => resolve();
@@ -253,6 +313,7 @@ export async function clearAllPlaybackRecords(): Promise<void> {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.HISTORY, 'readwrite');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.HISTORY);
       const req = store.clear();
       req.onsuccess = () => resolve();
@@ -277,6 +338,50 @@ export async function getFavoriteRecords(): Promise<PlaybackRecord[]> {
   return all.filter((r) => r.isFavorite === true);
 }
 
+// ================= v2: DISPLAY NAME / HIDDEN / MEDIA INFO =================
+
+/** Partial update of optional v2 fields on an existing record. */
+export async function updatePlaybackRecordFields(
+  mediaKey: string,
+  fields: Partial<Pick<PlaybackRecord, 'displayName' | 'hidden' | 'isFavorite' | 'mediaInfo' | 'subtitleName' | 'subtitleOffset'>>
+): Promise<PlaybackRecord | null> {
+  const record = await getPlaybackRecord(mediaKey);
+  if (!record) return null;
+  const updated: PlaybackRecord = { ...record, ...fields };
+  await savePlaybackRecord(updated);
+  return updated;
+}
+
+/** Set or clear a local display name. Returns the updated record, or null if not found. */
+export async function renamePlaybackRecord(mediaKey: string, displayName: string | null): Promise<PlaybackRecord | null> {
+  const trimmed = displayName ? displayName.trim().slice(0, 200) : '';
+  return updatePlaybackRecordFields(mediaKey, { displayName: trimmed.length > 0 ? trimmed : undefined });
+}
+
+/** Hide or unhide a record in the Library. The file itself is never touched. */
+export async function setHiddenRecord(mediaKey: string, hidden: boolean): Promise<PlaybackRecord | null> {
+  return updatePlaybackRecordFields(mediaKey, { hidden });
+}
+
+/** All records explicitly hidden from the Library. */
+export async function getHiddenRecords(): Promise<PlaybackRecord[]> {
+  const all = await getAllPlaybackRecords();
+  return all.filter((r) => r.hidden === true);
+}
+
+/** Records not marked hidden (default library view). */
+export async function getVisibleRecords(): Promise<PlaybackRecord[]> {
+  const all = await getAllPlaybackRecords();
+  return all.filter((r) => r.hidden !== true);
+}
+
+/** Cache metadata captured from a real file load. Small values only - no blobs. */
+export async function cacheMediaInfo(mediaKey: string, info: Omit<CachedMediaInfo, 'capturedAt'>): Promise<PlaybackRecord | null> {
+  return updatePlaybackRecordFields(mediaKey, {
+    mediaInfo: { ...info, capturedAt: Date.now() },
+  });
+}
+
 // ================= PLAYLIST OPERATIONS =================
 
 export async function savePlaylist(playlist: PlaylistRecord): Promise<void> {
@@ -284,6 +389,7 @@ export async function savePlaylist(playlist: PlaylistRecord): Promise<void> {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.PLAYLISTS, 'readwrite');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.PLAYLISTS);
       const req = store.put(playlist);
       req.onsuccess = () => resolve();
@@ -299,6 +405,7 @@ export async function getAllPlaylists(): Promise<PlaylistRecord[]> {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.PLAYLISTS, 'readonly');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.PLAYLISTS);
       const req = store.getAll();
       req.onsuccess = () => {
@@ -320,6 +427,7 @@ export async function deletePlaylist(id: string): Promise<void> {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.PLAYLISTS, 'readwrite');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.PLAYLISTS);
       const req = store.delete(id);
       req.onsuccess = () => resolve();
@@ -337,6 +445,7 @@ export async function saveSubtitleRecord(sub: SavedSubtitleRecord): Promise<void
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.SUBTITLES, 'readwrite');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.SUBTITLES);
       const req = store.put(sub);
       req.onsuccess = () => resolve();
@@ -352,6 +461,7 @@ export async function getSubtitleRecord(mediaKey: string): Promise<SavedSubtitle
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.SUBTITLES, 'readonly');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.SUBTITLES);
       const req = store.get(mediaKey);
       req.onsuccess = () => resolve(req.result || null);
@@ -367,6 +477,7 @@ export async function deleteSubtitleRecord(mediaKey: string): Promise<void> {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.SUBTITLES, 'readwrite');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.SUBTITLES);
       const req = store.delete(mediaKey);
       req.onsuccess = () => resolve();
@@ -382,6 +493,7 @@ export async function clearAllSubtitles(): Promise<void> {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.SUBTITLES, 'readwrite');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.SUBTITLES);
       const req = store.clear();
       req.onsuccess = () => resolve();
@@ -397,6 +509,7 @@ export async function clearAllPlaylists(): Promise<void> {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.PLAYLISTS, 'readwrite');
+      closeOnComplete(db, tx);
       const store = tx.objectStore(STORES.PLAYLISTS);
       const req = store.clear();
       req.onsuccess = () => resolve();

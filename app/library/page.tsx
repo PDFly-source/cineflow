@@ -22,6 +22,7 @@ import {
   PlaybackRecord,
 } from '@/lib/storage/db';
 import { formatTime, formatFileSize, formatDate, formatVideoTitle } from '@/lib/utils/formatters';
+import { filterLibraryRecords, getRecordTitle } from '@/lib/library/filters';
 import { useMedia } from '@/context/MediaSessionContext';
 import { BrandHeader } from '@/components/brand/Logo';
 import { EmptyStateCard } from '@/components/ui/EmptyStateCard';
@@ -61,19 +62,12 @@ export default function LibraryPage() {
     }
   };
 
-  // Filtered records
-  const filteredRecords = records
-    .filter((r) => {
-      const matchesSearch = r.fileName.toLowerCase().includes(searchQuery.toLowerCase());
-      if (!matchesSearch) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      if (sortOrder === 'recent') return b.lastPlayedAt - a.lastPlayedAt;
-      if (sortOrder === 'name') return a.fileName.localeCompare(b.fileName);
-      if (sortOrder === 'duration') return b.duration - a.duration;
-      return 0;
-    });
+  // Filtered records (favorites tab actually filters by isFavorite; hidden excluded)
+  const filteredRecords = filterLibraryRecords(records, {
+    tab: activeTab,
+    searchQuery,
+    sortOrder,
+  });
 
   return (
     <div className="flex-1 flex flex-col max-w-4xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 nav-clearance">
@@ -183,7 +177,7 @@ export default function LibraryPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
-                    {formatVideoTitle(item.fileName)}
+                    {formatVideoTitle(getRecordTitle(item))}
                   </p>
                   <div className="flex items-center gap-2 text-xs text-[var(--t3)] mt-0.5">
                     <span>{formatTime(item.duration)}</span>
