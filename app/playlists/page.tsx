@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
+  PencilLine,
   ListMusic,
   Plus,
   Trash2,
@@ -87,6 +88,17 @@ export default function PlaylistsPage() {
     if (selectedPlaylist?.id === id) {
       setSelectedPlaylist(updated.length > 0 ? updated[0] : null);
     }
+  };
+
+  const handleRenamePlaylist = async (playlist: PlaylistRecord) => {
+    const name = window.prompt('Rename playlist', playlist.name);
+    if (!name || !name.trim() || name.trim() === playlist.name) return;
+    const { renamePlaylist: renameHelper } = await import('@/lib/library/playlistActions');
+    const renamed = renameHelper(playlist, name);
+    await savePlaylist(renamed);
+    const list = await getAllPlaylists();
+    setPlaylists(list);
+    setSelectedPlaylist((prev) => (prev?.id === renamed.id ? renamed : prev));
   };
 
   const handleExportPlaylist = (playlist: PlaylistRecord) => {
@@ -238,6 +250,17 @@ export default function PlaylistsPage() {
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRenamePlaylist(pl);
+                        }}
+                        title="Rename playlist"
+                        aria-label={`Rename playlist ${pl.name}`}
+                        className="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-white/5 transition"
+                      >
+                        <PencilLine className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

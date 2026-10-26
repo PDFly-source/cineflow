@@ -7,9 +7,6 @@ import {
   Film,
   Search,
   Plus,
-  Play,
-  Trash2,
-  Star,
   Clock,
   ListMusic,
   ArrowUpDown,
@@ -19,13 +16,15 @@ import {
   getAllPlaybackRecords,
   deletePlaybackRecord,
   savePlaybackRecord,
-  PlaybackRecord,
 } from '@/lib/storage/db';
 import { formatTime, formatFileSize, formatDate, formatVideoTitle } from '@/lib/utils/formatters';
 import { filterLibraryRecords, getRecordTitle } from '@/lib/library/filters';
 import { useMedia } from '@/context/MediaSessionContext';
 import { BrandHeader } from '@/components/brand/Logo';
 import { EmptyStateCard } from '@/components/ui/EmptyStateCard';
+import { VideoLibraryItem } from '@/components/library/VideoLibraryItem';
+import { VideoActionSheet } from '@/components/library/VideoActionSheet';
+import { updatePlaybackRecordFields, type PlaybackRecord } from '@/lib/storage/db';
 
 export default function LibraryPage() {
   const router = useRouter();
@@ -35,6 +34,8 @@ export default function LibraryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'recent' | 'favorites' | 'playlists' | 'sort'>('recent');
   const [sortOrder, setSortOrder] = useState<'recent' | 'name' | 'duration'>('recent');
+  const [sheetRecord, setSheetRecord] = useState<PlaybackRecord | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -49,9 +50,30 @@ export default function LibraryPage() {
     };
   }, []);
 
+  const refreshRecords = async () => {
+    setRecords(await getAllPlaybackRecords());
+  };
+
   const handleDelete = async (id: string) => {
     await deletePlaybackRecord(id);
-    setRecords((prev) => prev.filter((r) => r.id !== id));
+    await refreshRecords();
+  };
+
+  const handleRecordChanged = async (updated: PlaybackRecord | null) => {
+    if (updated === null) {
+      // Entry was deleted from the sheet
+      await refreshRecords();
+      return;
+    }
+    setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+  };
+
+  const handleToggleFavorite = async (record: PlaybackRecord) => {
+    const updated = await updatePlaybackRecordFields(record.id, { isFavorite: !record.isFavorite });
+    if (updated) {
+      setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      if (sheetRecord?.id === updated.id) setSheetRecord(updated);
+    }
   };
 
   const handleSelectFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -151,10 +173,21 @@ export default function LibraryPage() {
           <div className="tile w-16 h-16 rounded-[22px] mb-4 flex items-center justify-center">
             <Film className="w-8 h-8 text-[var(--cy)]" />
           </div>
-          <h2 className="text-lg font-bold text-white mb-1.5">Nothing selected yet</h2>
-          <p className="text-xs sm:text-sm text-[var(--t2)] max-w-md leading-relaxed mb-6">
-            Pick the videos you want here. CineFlow only sees files you choose, then shows duration and resolution.
-          </p>
+          {activeTab === 'favorites' ? (
+            <>
+              <h2 className="text-lg font-bold text-white mb-1.5">No favorites yet</h2>
+              <p className="text-xs sm:text-sm text-[var(--t2)] max-w-md leading-relaxed mb-6">
+                Star videos from the Library or the player toolbar to see them here.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-bold text-white mb-1.5">Nothing selected yet</h2>
+              <p className="text-xs sm:text-sm text-[var(--t2)] max-w-md leading-relaxed mb-6">
+                Pick the videos you want here. CineFlow only sees files you choose, then shows duration and resolution.
+              </p>
+            </>
+          )}
           <button
             onClick={() => fileInputRef.current?.click()}
             className="btn pri w-full max-w-xs h-12"
@@ -166,46 +199,21 @@ export default function LibraryPage() {
       ) : (
         <div className="divide-y divide-[var(--bd)] rounded-2xl bg-[var(--es)] border border-[var(--bd)] overflow-hidden">
           {filteredRecords.map((item) => (
-            <div
+            <VideoLibraryItem
               key={item.id}
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-between p-3.5 hover:bg-[var(--ss)] transition cursor-pointer"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="tile">
-                  <Play className="w-4 h-4 text-[var(--cy)]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
-                    {formatVideoTitle(getRecordTitle(item))}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-[var(--t3)] mt-0.5">
-                    <span>{formatTime(item.duration)}</span>
-                    <span>·</span>
-                    <span>{formatFileSize(item.fileSize)}</span>
-                    <span>·</span>
-                    <span>{formatDate(item.lastPlayedAt)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="font-mono text-xs text-[var(--cy)] font-semibold">
-                  {item.progressPercent}%
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(item.id);
-                  }}
-                  className="p-1.5 text-[var(--t3)] hover:text-[var(--er)] transition"
-                  title="Remove from library"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+              record={item}
+              onOpen={() => fileInputRef.current?.click()}
+              onOpenMenu={(r) => setSheetRecord(r)}
+              onToggleFavorite={handleToggleFavorite}
+            />
           ))}
+        </div>
+      )}
+
+      {/* Notice banner (honest limitations) */}
+      {notice && (
+        <div className="card p-4 text-sm text-[var(--t2)]" role="status">
+          {notice}
         </div>
       )}
 
@@ -242,6 +250,27 @@ export default function LibraryPage() {
           />
         </div>
       </div>
+
+      {/* 3-dot action sheet */}
+      {sheetRecord && (
+        <VideoActionSheet
+          record={sheetRecord}
+          onClose={() => setSheetRecord(null)}
+          onRecordChanged={handleRecordChanged}
+          onConvertToMp3={() => {
+            setSheetRecord(null);
+            setNotice(
+              'Video to MP3 needs the original file. CineFlow never stores copies, so the converter will ask you to re-select the video from your device. The converter screen is being finalized in this update phase.'
+            );
+          }}
+          onTransfer={() => {
+            setSheetRecord(null);
+            setNotice(
+              'File transfer needs the original file and a second device with CineFlow open. Transfer is being finalized in this update phase; no transfer has been started.'
+            );
+          }}
+        />
+      )}
     </div>
   );
 }

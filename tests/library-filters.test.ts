@@ -91,3 +91,49 @@ test('getRecordTitle: display name wins when set, file name otherwise', () => {
   assert.equal(getRecordTitle({ fileName: 'f.mp4', displayName: '   ' }), 'f.mp4');
   assert.equal(getRecordTitle({ fileName: 'f.mp4' }), 'f.mp4');
 });
+
+// ---------- playlist action helpers ----------
+import { withRecordAdded, buildNewPlaylist, renamePlaylist } from '../lib/library/playlistActions.ts';
+import type { PlaylistRecord } from '../lib/storage/db.ts';
+
+test('withRecordAdded: appends record and bumps updatedAt; no duplicates', () => {
+  const rec = makeRecord({ id: 'x', fileName: 'movie.mp4', fileSize: 42, lastModified: 7, duration: 55 });
+  const pl: PlaylistRecord = { id: 'pl1', name: 'Trips', createdAt: 1, updatedAt: 1, items: [] };
+
+  const updated = withRecordAdded(pl, rec);
+  assert.ok(updated);
+  assert.equal(updated.items.length, 1);
+  assert.equal(updated.items[0].name, 'movie.mp4');
+  assert.equal(updated.items[0].size, 42);
+  assert.ok(updated.updatedAt >= pl.updatedAt);
+
+  // Adding the same record again returns null (duplicate refused).
+  const dup = withRecordAdded(updated, rec);
+  assert.equal(dup, null);
+
+  // A different record (different lastModified) is appended.
+  const rec2 = makeRecord({ id: 'y', fileName: 'movie.mp4', fileSize: 42, lastModified: 99, duration: 55 });
+  const two = withRecordAdded(updated, rec2);
+  assert.ok(two);
+  assert.equal(two.items.length, 2);
+
+  // Original playlist object is not mutated.
+  assert.equal(pl.items.length, 0);
+});
+
+test('buildNewPlaylist: creates playlist with one item and unique id', () => {
+  const rec = makeRecord({ id: 'a', fileName: 'v.webm', fileSize: 10, lastModified: 2, duration: 33 });
+  const pl = buildNewPlaylist('My List', rec);
+  assert.equal(pl.name, 'My List');
+  assert.equal(pl.items.length, 1);
+  assert.ok(pl.id.startsWith('pl_'));
+  assert.ok(pl.createdAt > 0);
+});
+
+test('renamePlaylist: trims, caps length, bumps updatedAt', () => {
+  const pl: PlaylistRecord = { id: 'p', name: 'Old', createdAt: 1, updatedAt: 1, items: [] };
+  const renamed = renamePlaylist(pl, '  New Name  ');
+  assert.equal(renamed.name, 'New Name');
+  assert.ok(renamed.updatedAt >= pl.updatedAt);
+  assert.equal(pl.name, 'Old');
+});
