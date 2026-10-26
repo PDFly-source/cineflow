@@ -1,0 +1,6 @@
+{
+  "name": "CineFlow - Private Local Video Player",
+  "description": "A privacy-first, browser-native cinematic video player with offline PWA support, local subtitle parsing, gesture controls, and zero cloud uploads.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
