@@ -40,14 +40,29 @@ export default function MorePage() {
   const [hidden, setHidden] = useState<PlaybackRecord[]>([]);
   const [transfers, setTransfers] = useState<SavedTransferSession[]>([]);
 
+  // Reload after actions (event handlers may set state directly).
   const refresh = useCallback(() => {
     getHiddenRecords().then(setHidden).catch(() => setHidden([]));
     setTransfers(getTransferHistory());
   }, []);
 
+  // Initial load: all state updates go through async callbacks, never synchronously.
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let alive = true;
+    getHiddenRecords()
+      .then((h) => {
+        if (alive) setHidden(h);
+      })
+      .catch(() => {
+        if (alive) setHidden([]);
+      });
+    Promise.resolve().then(() => {
+      if (alive) setTransfers(getTransferHistory());
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const unhide = async (key: string) => {
     await setHiddenRecord(key, false);

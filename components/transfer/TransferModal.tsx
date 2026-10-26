@@ -28,7 +28,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({ onClose }) => {
   const [copied, setCopied] = useState(false);
   const [progress, setProgress] = useState<{ bytes: number; total: number } | null>(null);
   const [incoming, setIncoming] = useState<FileMeta | null>(null);
-  const [receivedBlob, setReceivedBlob] = useState<{ blob: Blob; meta: FileMeta; verified: boolean } | null>(null);
+  const [receivedBlob, setReceivedBlob] = useState<{ blob: Blob; meta: FileMeta; verified: boolean; url: string } | null>(null);
   const [sentVerified, setSentVerified] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,9 +62,9 @@ export const TransferModal: React.FC<TransferModalProps> = ({ onClose }) => {
         setProgress({ bytes: e.bytes, total: e.total });
         break;
       case 'received':
-        setReceivedBlob({ blob: e.blob, meta: e.meta, verified: e.verified });
         if (receiveUrlRef.current) URL.revokeObjectURL(receiveUrlRef.current);
         receiveUrlRef.current = URL.createObjectURL(e.blob);
+        setReceivedBlob({ blob: e.blob, meta: e.meta, verified: e.verified, url: receiveUrlRef.current });
         break;
       case 'sent':
         setSentVerified(e.verified);
@@ -321,14 +321,14 @@ export const TransferModal: React.FC<TransferModalProps> = ({ onClose }) => {
                   <p className="text-[var(--t3)]">{formatFileSize(incoming.size)} · SHA-256 declared</p>
                 </div>
               )}
-              {receivedBlob && receiveUrlRef.current && (
+              {receivedBlob && (
                 <div className="space-y-2 rounded-2xl border border-emerald-400/30 bg-emerald-400/5 p-3">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
                     <ShieldCheck className="w-4 h-4" />
                     {receivedBlob.verified ? 'Verified (SHA-256 match)' : 'Received, but checksum mismatch!'}
                   </p>
                   <a
-                    href={receiveUrlRef.current}
+                    href={receivedBlob.url}
                     download={receivedBlob.meta.name}
                     className="btn pri h-11 w-full text-sm"
                   >

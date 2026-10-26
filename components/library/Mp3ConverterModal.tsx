@@ -29,6 +29,7 @@ export const Mp3ConverterModal: React.FC<Mp3ConverterModalProps> = ({ onClose, r
   const [result, setResult] = useState<Mp3ConvertResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const downloadUrlRef = useRef<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export const Mp3ConverterModal: React.FC<Mp3ConverterModalProps> = ({ onClose, r
     setResult(null);
     setError(null);
     setProgress(null);
+    setDownloadUrl(null);
     if (!keepFile) setFile(null);
   };
 
@@ -67,6 +69,7 @@ export const Mp3ConverterModal: React.FC<Mp3ConverterModalProps> = ({ onClose, r
         onProgress: setProgress,
       });
       downloadUrlRef.current = URL.createObjectURL(res.blob);
+      setDownloadUrl(downloadUrlRef.current);
       setResult(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Conversion failed for an unknown reason.');
@@ -193,7 +196,7 @@ export const Mp3ConverterModal: React.FC<Mp3ConverterModalProps> = ({ onClose, r
             </p>
           )}
 
-          {result && downloadUrlRef.current && (
+          {result && downloadUrl && (
             <div className="space-y-3 rounded-2xl border border-emerald-400/30 bg-emerald-400/5 p-3">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
                 <CheckCircle2 className="w-4 h-4" /> MP3 ready ({formatFileSize(result.byteLength)})
@@ -203,7 +206,7 @@ export const Mp3ConverterModal: React.FC<Mp3ConverterModalProps> = ({ onClose, r
                 {result.bitrate} kbps · verified MP3 signature
               </p>
               <a
-                href={downloadUrlRef.current}
+                href={downloadUrl}
                 download={`${file?.name.replace(/\.[^.]+$/, '') ?? 'cineflow'}.mp3`}
                 className="btn pri h-11 w-full text-sm"
               >

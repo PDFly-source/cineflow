@@ -83,7 +83,15 @@ export const VideoPlayer: React.FC = () => {
   const [brightness, setBrightness] = useState<number>(100);
   const [zoomScale, setZoomScale] = useState<number>(1.0);
   // Visual orientation (rotation/flips) - playback state is untouched.
-  const [orientation, setOrientation] = useState<VideoOrientation>(DEFAULT_ORIENTATION);
+  const [orientationState, setOrientationState] = useState<{ mediaUrl?: string; value: VideoOrientation }>({
+    value: DEFAULT_ORIENTATION,
+  });
+  // Orientation belongs to the current media; switching files derives an upright view
+  // without a reset effect.
+  const orientation: VideoOrientation =
+    orientationState.mediaUrl === currentItem?.objectUrl ? orientationState.value : DEFAULT_ORIENTATION;
+  const applyOrientation = (next: VideoOrientation) =>
+    setOrientationState({ mediaUrl: currentItem?.objectUrl, value: next });
   const [videoNaturalSize, setVideoNaturalSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [containerSize, setContainerSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
@@ -156,11 +164,6 @@ export const VideoPlayer: React.FC = () => {
         });
     }
   }, [currentItem]);
-
-  // Reset orientation when the media changes (new file -> upright view)
-  useEffect(() => {
-    setOrientation(DEFAULT_ORIENTATION);
-  }, [currentItem?.objectUrl]);
 
   // Track container size so rotated video bounds can be computed without clipping.
   useEffect(() => {
@@ -804,12 +807,12 @@ export const VideoPlayer: React.FC = () => {
         onChangeFitMode={setFitMode}
         onToggleLoop={toggleLoop}
         orientation={orientation}
-        onRotateClockwise={() => setOrientation((o) => rotateClockwise(o))}
-        onRotateCounterClockwise={() => setOrientation((o) => rotateCounterClockwise(o))}
-        onRotate180={() => setOrientation((o) => rotate180(o))}
-        onFlipHorizontal={() => setOrientation((o) => flipHorizontal(o))}
-        onFlipVertical={() => setOrientation((o) => flipVertical(o))}
-        onResetOrientation={() => setOrientation(resetOrientationState())}
+        onRotateClockwise={() => applyOrientation(rotateClockwise(orientation))}
+        onRotateCounterClockwise={() => applyOrientation(rotateCounterClockwise(orientation))}
+        onRotate180={() => applyOrientation(rotate180(orientation))}
+        onFlipHorizontal={() => applyOrientation(flipHorizontal(orientation))}
+        onFlipVertical={() => applyOrientation(flipVertical(orientation))}
+        onResetOrientation={() => applyOrientation(resetOrientationState())}
         onPrevTrack={prevTrack}
         onNextTrack={nextTrack}
         onOpenSubtitles={() => setShowSubtitlesModal(true)}
