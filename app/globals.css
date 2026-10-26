@@ -247,6 +247,33 @@ svg.i {
   box-shadow: inset 0 0 0 1px rgba(128, 107, 255, 0.08);
 }
 
+/** Section heading on dashboards */
+.sec-h {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t3);
+  margin-bottom: 10px;
+}
+
+/** Full-width tappable tile row (More page, menus) */
+.tilebtn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 18px;
+  background: var(--ss, #0f1526);
+  border: 1px solid var(--bd, #202b48);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+}
+.tilebtn:hover {
+  border-color: var(--bv);
+}
+
 .tile {
   width: 44px;
   height: 44px;

@@ -107,16 +107,17 @@ export const BottomPillNav: React.FC = () => {
           </svg>
         </button>
 
-        {/* 5: Settings */}
+        {/* 5: More (Settings, transfer, hidden, tools) */}
         <Link
-          href="/settings"
-          className={pathname === '/settings' ? 'on' : ''}
-          aria-label="Settings"
-          title="Advanced Settings"
+          href="/more"
+          className={pathname === '/more' ? 'on' : ''}
+          aria-label="More"
+          title="More: transfer, MP3, hidden, settings"
         >
           <svg className="i w-5 h-5" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="3" stroke="currentColor" fill="none" strokeWidth="1.7" />
-            <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" stroke="currentColor" fill="none" strokeWidth="1.7" strokeLinecap="round" />
+            <circle cx="6" cy="12" r="1.6" fill="currentColor" />
+            <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+            <circle cx="18" cy="12" r="1.6" fill="currentColor" />
           </svg>
         </Link>
       </nav>

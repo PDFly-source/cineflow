@@ -3,7 +3,8 @@
 import React, { useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { FolderOpen, Film, Library, ListMusic, Settings, ShieldCheck, Activity } from 'lucide-react';
+import {
+  LayoutGrid, FolderOpen, Film, Library, ListMusic, Settings, ShieldCheck, Activity } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useMedia } from '@/context/MediaSessionContext';
 import { LogoIcon, LogoWordmark } from '@/components/brand/Logo';
@@ -32,6 +33,7 @@ export const Navbar: React.FC = () => {
     { label: 'Library', href: '/library', icon: Library },
     { label: 'Playlists', href: '/playlists', icon: ListMusic },
     { label: 'Diagnostics', href: '/diagnostics', icon: Activity },
+    { label: 'More', href: '/more', icon: LayoutGrid },
     { label: 'Settings', href: '/settings', icon: Settings },
     { label: 'Privacy', href: '/privacy', icon: ShieldCheck },
   ];
