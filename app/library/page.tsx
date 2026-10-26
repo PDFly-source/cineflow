@@ -25,6 +25,7 @@ import { EmptyStateCard } from '@/components/ui/EmptyStateCard';
 import { VideoLibraryItem } from '@/components/library/VideoLibraryItem';
 import { VideoActionSheet } from '@/components/library/VideoActionSheet';
 import { Mp3ConverterModal } from '@/components/library/Mp3ConverterModal';
+import { TransferModal } from '@/components/transfer/TransferModal';
 import { updatePlaybackRecordFields, type PlaybackRecord } from '@/lib/storage/db';
 
 export default function LibraryPage() {
@@ -37,6 +38,7 @@ export default function LibraryPage() {
   const [sortOrder, setSortOrder] = useState<'recent' | 'name' | 'duration'>('recent');
   const [sheetRecord, setSheetRecord] = useState<PlaybackRecord | null>(null);
   const [mp3RecordHint, setMp3RecordHint] = useState<{ fileName: string; fileSize: number } | null>(null);
+  const [showTransfer, setShowTransfer] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -265,9 +267,7 @@ export default function LibraryPage() {
           }}
           onTransfer={() => {
             setSheetRecord(null);
-            setNotice(
-              'File transfer needs the original file and a second device with CineFlow open. Transfer is being finalized in this update phase; no transfer has been started.'
-            );
+            setShowTransfer(true);
           }}
         />
       )}
@@ -276,6 +276,9 @@ export default function LibraryPage() {
       {mp3RecordHint && (
         <Mp3ConverterModal recordHint={mp3RecordHint} onClose={() => setMp3RecordHint(null)} />
       )}
+
+      {/* Device-to-device transfer */}
+      {showTransfer && <TransferModal onClose={() => setShowTransfer(false)} />}
     </div>
   );
 }

@@ -48,9 +48,9 @@ export const ServiceWorkerRegistrar: React.FC = () => {
 
   if (isOffline) {
     return (
-      <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-xl bg-amber-950/90 border border-amber-600/40 text-amber-200 px-3.5 py-2 text-xs font-medium shadow-2xl backdrop-blur-md">
+      <div className="fixed left-4 z-40 max-w-[calc(100vw-2rem)] flex items-center gap-2 rounded-xl bg-amber-950/90 border border-amber-600/40 text-amber-200 px-3.5 py-2 text-xs font-medium shadow-2xl backdrop-blur-md bottom-[calc(88px+env(safe-area-inset-bottom,0px))] sm:bottom-4">
         <WifiOff className="w-4 h-4 text-amber-400 shrink-0" />
-        <span>Offline Mode — Media playing locally from your device</span>
+        <span className="truncate">Offline Mode — Media playing locally from your device</span>
       </div>
     );
   }

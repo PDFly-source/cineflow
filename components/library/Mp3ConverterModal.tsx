@@ -29,6 +29,7 @@ export const Mp3ConverterModal: React.FC<Mp3ConverterModalProps> = ({ onClose, r
   const [result, setResult] = useState<Mp3ConvertResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const downloadUrlRef = useRef<string | null>(null);
+  const cancelledRef = useRef(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,19 +63,26 @@ export const Mp3ConverterModal: React.FC<Mp3ConverterModalProps> = ({ onClose, r
   const handleConvert = async () => {
     if (!file) return;
     reset(true);
+    cancelledRef.current = false;
     setConverting(true);
     try {
       const res = await convertFileToMp3(file, {
         bitrate,
+        isCancelled: () => cancelledRef.current,
         onProgress: setProgress,
       });
       downloadUrlRef.current = URL.createObjectURL(res.blob);
       setDownloadUrl(downloadUrlRef.current);
       setResult(res);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Conversion failed for an unknown reason.');
+      if (err instanceof Error && err.message === 'CANCELLED') {
+        setError('Conversion cancelled. No file was created and no partial output is kept.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Conversion failed for an unknown reason.');
+      }
     } finally {
       setConverting(false);
+      setProgress(null);
     }
   };
 
@@ -170,10 +178,17 @@ export const Mp3ConverterModal: React.FC<Mp3ConverterModalProps> = ({ onClose, r
             </div>
           </div>
 
-          <button onClick={handleConvert} disabled={!file || converting} className="btn pri h-12 w-full text-sm">
-            {converting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Music4 className="w-4 h-4" />}
-            <span>{converting ? 'Converting…' : 'Convert to MP3'}</span>
-          </button>
+          <div className="flex gap-2">
+            <button onClick={handleConvert} disabled={!file || converting} className="btn pri h-12 flex-1 text-sm">
+              {converting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Music4 className="w-4 h-4" />}
+              <span>{converting ? 'Converting…' : 'Convert to MP3'}</span>
+            </button>
+            {converting && (
+              <button onClick={() => (cancelledRef.current = true)} className="btn sec h-12 px-5 text-sm">
+                Cancel
+              </button>
+            )}
+          </div>
 
           {converting && progress && (
             <div className="space-y-1.5">

@@ -76,6 +76,21 @@ export const TransferModal: React.FC<TransferModalProps> = ({ onClose }) => {
     }
   };
 
+  const startOver = () => {
+    sessionRef.current?.close();
+    sessionRef.current = null;
+    setStatus('idle');
+    setDetail(null);
+    setMyCode(null);
+    setTheirCode('');
+    setProgress(null);
+    setIncoming(null);
+    setReceivedBlob(null);
+    setSentVerified(null);
+    setError(null);
+    setBusy(false);
+  };
+
   const freshSession = () => {
     sessionRef.current?.close();
     const s = new TransferSession({ role: mode === 'send' ? 'sender' : 'receiver', onEvent: handleEvent });
@@ -353,6 +368,22 @@ export const TransferModal: React.FC<TransferModalProps> = ({ onClose }) => {
           )}
 
           {detail && !error && <p className="text-[11px] text-[var(--t3)]">{detail}</p>}
+
+          {(status === 'cancelled' || status === 'failed') && (
+            <div className="flex gap-2">
+              <button onClick={startOver} className="btn sec h-11 flex-1 text-xs">
+                Start over with a new connection
+              </button>
+            </div>
+          )}
+          {transferring && (
+            <button
+              onClick={() => sessionRef.current?.cancel()}
+              className="btn sec h-11 w-full text-xs"
+            >
+              Cancel transfer
+            </button>
+          )}
 
           <div className="rounded-2xl border border-[var(--bd)] bg-[var(--ss)] p-3">
             <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--t3)]">How it works / limits</p>

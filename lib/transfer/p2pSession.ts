@@ -181,7 +181,9 @@ export class TransferSession {
     this.receivedBytes += chunk.byteLength;
     this.emit({ type: 'progress', bytes: this.receivedBytes, total: this.incomingMeta.size });
     if (this.receivedBytes >= this.incomingMeta.size) {
-      this.status('verifying');
+      // All expected bytes are in: verify immediately. Waiting for the
+      // sender's "done" would deadlock (the sender waits for our ack first).
+      void this.finishReceive();
     }
   }
 
@@ -288,21 +290,23 @@ export class TransferSession {
 
   private waitForDrain(channel: RTCDataChannel): Promise<void> {
     return new Promise((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        channel.removeEventListener('bufferedamountlow', done);
+        clearInterval(timer);
+        resolve();
+      };
+      // A closed/cancelled channel never fires bufferedamountlow and its
+      // bufferedAmount never drains - unblock so cancel/disconnect cannot hang.
       const check = () => {
-        if (channel.bufferedAmount <= BUFFER_LOW) {
-          channel.removeEventListener('bufferedamountlow', check);
-          resolve();
-        }
+        if (channel.bufferedAmount <= BUFFER_LOW || channel.readyState !== 'open') done();
       };
       channel.bufferedAmountLowThreshold = BUFFER_LOW;
-      channel.addEventListener('bufferedamountlow', check);
+      channel.addEventListener('bufferedamountlow', done);
       // Safety poll in case the event never fires.
-      const timer = setInterval(() => {
-        if (channel.bufferedAmount <= BUFFER_LOW || channel.readyState !== 'open') {
-          clearInterval(timer);
-          check();
-        }
-      }, 250);
+      const timer = setInterval(check, 250);
       setTimeout(() => clearInterval(timer), 60000);
     });
   }
