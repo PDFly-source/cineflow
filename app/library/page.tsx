@@ -76,7 +76,7 @@ export default function LibraryPage() {
     });
 
   return (
-    <div className="flex-1 flex flex-col max-w-4xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4">
+    <div className="flex-1 flex flex-col max-w-4xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 nav-clearance">
       {/* Hidden File Picker */}
       <input
         ref={fileInputRef}

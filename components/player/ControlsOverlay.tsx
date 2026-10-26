@@ -194,6 +194,15 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showABMenu, setShowABMenu] = useState(false);
   const scrubBarRef = useRef<HTMLDivElement>(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+
+  const seekToClientX = (clientX: number) => {
+    if (!scrubBarRef.current || duration <= 0) return;
+    const rect = scrubBarRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    const percentage = x / rect.width;
+    onSeek(percentage * duration);
+  };
 
   const effectiveProgress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -214,14 +223,6 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
     setHoverTime(null);
   };
 
-  const handleScrubClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!scrubBarRef.current || duration <= 0) return;
-    const rect = scrubBarRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-    const percentage = x / rect.width;
-    onSeek(percentage * duration);
-  };
-
   const closeAllMenus = () => {
     setShowSpeedMenu(false);
     setShowFitMenu(false);
@@ -239,7 +240,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   return (
     <div
       onClick={closeAllMenus}
-      className={`absolute inset-0 z-20 flex flex-col justify-between p-4 sm:p-7 transition-opacity duration-300 pointer-events-none ${
+      className={`absolute inset-0 z-20 flex flex-col justify-between pt-4 px-4 sm:pt-7 sm:px-7 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(1.75rem+env(safe-area-inset-bottom,0px))] transition-opacity duration-300 pointer-events-none ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
     >
@@ -376,8 +377,28 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
           ref={scrubBarRef}
           onMouseMove={handleScrubMouseMove}
           onMouseLeave={handleScrubMouseLeave}
-          onClick={handleScrubClick}
-          className="relative py-2.5 flex items-center cursor-pointer group"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            setIsScrubbing(true);
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+            seekToClientX(e.clientX);
+          }}
+          onPointerMove={(e) => {
+            if (isScrubbing) seekToClientX(e.clientX);
+          }}
+          onPointerUp={(e) => {
+            setIsScrubbing(false);
+            try {
+              (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+            } catch {}
+          }}
+          onPointerCancel={(e) => {
+            setIsScrubbing(false);
+            try {
+              (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+            } catch {}
+          }}
+          className="relative py-3.5 sm:py-2.5 flex items-center cursor-pointer group touch-none"
           role="slider"
           aria-label="Seek Video"
           aria-valuemin={0}
@@ -386,7 +407,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
           tabIndex={0}
         >
           {/* Base track */}
-          <div className="w-full h-1.5 group-hover:h-2.5 rounded-full bg-white/20 relative overflow-hidden transition-all">
+          <div className="w-full h-2 sm:h-1.5 sm:group-hover:h-2.5 rounded-full bg-white/20 relative overflow-hidden transition-all">
             {/* Buffered ranges */}
             {duration > 0 &&
               bufferedRanges.map((range, idx) => {
@@ -426,7 +447,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
 
           {/* White Glowing Knob Thumb (Screen 2) */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-[0_0_0_4px_rgba(105,85,255,0.45)] pointer-events-none transition-transform group-hover:scale-125"
+            className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 sm:w-3.5 sm:h-3.5 rounded-full bg-white shadow-[0_0_0_4px_rgba(105,85,255,0.45)] pointer-events-none transition-transform ${isScrubbing ? "scale-125" : "sm:group-hover:scale-125"}`}
             style={{ left: `calc(${effectiveProgress}% - 7px)` }}
           />
 

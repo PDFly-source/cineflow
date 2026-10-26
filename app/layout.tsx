@@ -54,7 +54,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-[var(--ob)] text-[var(--tx)] antialiased selection:bg-[var(--ev)] selection:text-white flex flex-col font-sans pb-24 md:pb-12">
+      <body className="min-h-screen bg-[var(--ob)] text-[var(--tx)] antialiased selection:bg-[var(--ev)] selection:text-white flex flex-col font-sans">
         <MediaProvider>
           <SplashScreen />
           <Navbar />

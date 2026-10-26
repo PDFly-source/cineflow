@@ -556,7 +556,7 @@ export const VideoPlayer: React.FC = () => {
     <div
       ref={containerRef}
       onMouseMove={resetAutoHideTimer}
-      className="relative flex-1 w-full bg-black overflow-hidden select-none flex items-center justify-center min-h-[500px]"
+      className="relative flex-1 w-full bg-black overflow-hidden select-none flex items-center justify-center min-h-[280px] touch-none"
       style={{
         cursor: isControlsEffectivelyVisible ? 'default' : 'none',
       }}

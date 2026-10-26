@@ -277,6 +277,23 @@ svg.i {
 }
 
 /* Floating Bottom Navigation Pill */
+/* Player page: fill the viewport below the fixed navbar.
+   dvh avoids mobile browser-chrome overlap; vh is the fallback. */
+.player-page {
+  height: calc(100vh - 4rem);
+  height: calc(100dvh - 4rem);
+}
+
+/* Clearance so the floating bottom navigation never covers page content. */
+.nav-clearance {
+  padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  .nav-clearance {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 .pill {
   position: fixed;
   left: 50%;
@@ -284,6 +301,7 @@ svg.i {
   bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   height: 64px;
   width: 350px;
+  max-width: calc(100vw - 20px);
   border-radius: 32px;
   background: rgba(16, 22, 39, 0.94);
   border: 1px solid rgba(105, 85, 255, 0.3);

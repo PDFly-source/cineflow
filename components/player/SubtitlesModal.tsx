@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useRef } from 'react';
-import { X, Upload, RotateCcw, Check, Type, FileText } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { X, Upload, RotateCcw, Check, Type, FileText, AlertCircle } from 'lucide-react';
 import { useMedia } from '@/context/MediaSessionContext';
+import { parseSubtitleFile } from '@/lib/subtitles/parser';
 import { SubtitleSize } from '@/lib/storage/db';
 
 interface SubtitlesModalProps {
@@ -30,13 +31,36 @@ export const SubtitlesModal: React.FC<SubtitlesModalProps> = ({ isOpen, onClose 
   } = useMedia();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isCheckingFile, setIsCheckingFile] = useState(false);
 
   if (!isOpen) return null;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      await loadSubtitleFile(file);
+    if (!file) return;
+    setLoadError(null);
+    setIsCheckingFile(true);
+    try {
+      // Validate with the real parser before loading so invalid files get a clear message.
+      const text = await file.text();
+      const probe = parseSubtitleFile(text, file.name, 0);
+      if (probe.cues.length === 0) {
+        setLoadError(
+          `"${file.name}" contains no usable subtitle cues. Make sure it is a valid .srt or .vtt file with "HH:MM:SS,mmm --> HH:MM:SS,mmm" time lines.`
+        );
+        e.target.value = '';
+        return;
+      }
+      const ok = await loadSubtitleFile(file);
+      if (!ok) {
+        setLoadError(`Could not load "${file.name}". The file may be unreadable or encoded in an unsupported charset.`);
+      }
+    } catch {
+      setLoadError(`Could not read "${file.name}". Try re-saving it as UTF-8 .srt or .vtt.`);
+    } finally {
+      setIsCheckingFile(false);
+      e.target.value = '';
     }
   };
 
@@ -76,11 +100,11 @@ export const SubtitlesModal: React.FC<SubtitlesModalProps> = ({ isOpen, onClose 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto"
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md rounded-[32px] bg-[var(--es)] border border-[var(--bd)] p-5 shadow-2xl text-[var(--tx)] my-auto select-none"
+        className="relative w-full max-w-md max-h-[calc(100dvh-2rem)] rounded-[32px] bg-[var(--es)] border border-[var(--bd)] shadow-2xl text-[var(--tx)] my-auto select-none overflow-y-auto overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Hidden Subtitle File Input */}
@@ -94,7 +118,7 @@ export const SubtitlesModal: React.FC<SubtitlesModalProps> = ({ isOpen, onClose 
         />
 
         {/* Header (Screen 5) */}
-        <div className="flex items-center justify-between pb-3">
+        <div className="sticky top-0 z-10 flex items-center justify-between pb-3 px-5 pt-5 -mx-5 bg-[var(--es)]/95 backdrop-blur-sm rounded-t-[32px]">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-extrabold tracking-tight text-white">Subtitle Studio</h2>
           </div>
@@ -115,6 +139,7 @@ export const SubtitlesModal: React.FC<SubtitlesModalProps> = ({ isOpen, onClose 
           </div>
         </div>
 
+        <div className="px-5 pb-6">
         {/* Live Preview Scene (Screen 5) */}
         <div className="scene h-44 rounded-2xl border border-[#34416A] mb-3 relative flex items-center justify-center p-4">
           <div className="shade pointer-events-none" />
@@ -166,6 +191,14 @@ export const SubtitlesModal: React.FC<SubtitlesModalProps> = ({ isOpen, onClose 
             </button>
           )}
         </div>
+
+        {/* Load error — real parser feedback, no silent failures */}
+        {loadError && (
+          <div className="mb-3 flex items-start gap-2.5 rounded-2xl border border-red-500/30 bg-red-950/40 p-3 text-left">
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <p className="text-xs leading-relaxed text-red-200">{loadError}</p>
+          </div>
+        )}
 
         {/* Configuration Rows Card (Screen 5) */}
         <div className="card p-1 sm:p-2 divide-y divide-[var(--bd)]/60 text-sm font-semibold">
@@ -291,6 +324,7 @@ export const SubtitlesModal: React.FC<SubtitlesModalProps> = ({ isOpen, onClose 
               </button>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

@@ -17,7 +17,7 @@ const VideoPlayer = dynamic(
 
 export default function PlayerPage() {
   return (
-    <div className="flex-1 flex flex-col w-full h-[calc(100vh-4rem)] md:h-[calc(100vh-4rem)] bg-black">
+    <div className="player-page flex-1 flex flex-col w-full bg-black min-h-0">
       <VideoPlayer />
     </div>
   );

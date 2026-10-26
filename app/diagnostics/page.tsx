@@ -40,7 +40,7 @@ export default function DiagnosticsPage() {
   if (!report) return null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-8 nav-clearance">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Top bar */}
         <div className="flex items-center justify-between">

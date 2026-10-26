@@ -120,7 +120,7 @@ export default function HomePage() {
   );
 
   return (
-    <div className="flex-1 flex flex-col max-w-4xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-6">
+    <div className="flex-1 flex flex-col max-w-4xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-6 nav-clearance">
       {/* Hidden File Pickers */}
       <input
         ref={singleFileInputRef}
