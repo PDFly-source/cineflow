@@ -26,7 +26,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       // Private mode / storage disabled — skip the splash rather than loop it.
       alreadyShown = true;
     }
-    if (!alreadyShown) setIsVisible(true);
+    if (alreadyShown) return;
+    // Defer so the effect body itself stays render-free (lint: setState-in-effect).
+    const t = setTimeout(() => setIsVisible(true), 0);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {

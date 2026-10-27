@@ -36,15 +36,18 @@ export default function DiagnosticsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const initial = runPlaybackDiagnostics();
-    setReport(initial);
-    augmentWithDecodingInfo(initial).then((aug) => {
-      if (!cancelled) setReport(aug);
+    // Defer so the effect body stays render-free (lint: setState-in-effect).
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const initial = runPlaybackDiagnostics();
+      setReport(initial);
+      augmentWithDecodingInfo(initial).then((aug) => {
+        if (!cancelled) setReport(aug);
+      });
     });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshReport = () => {
