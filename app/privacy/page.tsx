@@ -12,7 +12,6 @@ import {
   Database,
 } from 'lucide-react';
 import Link from 'next/link';
-import { BrandHeader } from '@/components/brand/Logo';
 
 export default function PrivacyPage() {
   const privacyPillars = [
@@ -56,7 +55,6 @@ export default function PrivacyPage() {
 
   return (
     <div className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 nav-clearance">
-      <BrandHeader className="md:hidden" />
 
       {/* Header */}
       <div className="space-y-3 pb-6 border-b border-slate-800">

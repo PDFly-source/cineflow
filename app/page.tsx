@@ -32,7 +32,6 @@ import {
 import { formatTime, formatFileSize, formatDate, formatVideoTitle } from '@/lib/utils/formatters';
 import { PWAInstallButton } from '@/components/app-shell/PWAInstallButton';
 import { generateTestClipFile } from '@/lib/media/testClipGenerator';
-import { BrandHeader } from '@/components/brand/Logo';
 import { EmptyStateCard } from '@/components/ui/EmptyStateCard';
 
 export default function HomePage() {
@@ -147,7 +146,6 @@ export default function HomePage() {
       />
 
       {/* Brand Header for mobile / subview */}
-      <BrandHeader className="md:hidden" />
 
       {/* Hero Vector Mountain Sunset Scene (Screen 1) */}
       <section className="relative overflow-hidden rounded-[30px] border border-[#34416A] scene min-h-[440px] flex flex-col justify-between p-6 sm:p-8 shadow-2xl">

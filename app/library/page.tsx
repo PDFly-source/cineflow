@@ -7,10 +7,10 @@ import {
   Film,
   Search,
   Plus,
-  Clock,
   ListMusic,
   ArrowUpDown,
   FolderOpen,
+  X,
 } from 'lucide-react';
 import {
   getAllPlaybackRecords,
@@ -20,7 +20,6 @@ import {
 import { formatTime, formatFileSize, formatDate, formatVideoTitle } from '@/lib/utils/formatters';
 import { filterLibraryRecords, getRecordTitle } from '@/lib/library/filters';
 import { useMedia } from '@/context/MediaSessionContext';
-import { BrandHeader } from '@/components/brand/Logo';
 import { EmptyStateCard } from '@/components/ui/EmptyStateCard';
 import { VideoLibraryItem } from '@/components/library/VideoLibraryItem';
 import { VideoActionSheet } from '@/components/library/VideoActionSheet';
@@ -41,6 +40,7 @@ export default function LibraryPage() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let isSubscribed = true;
@@ -52,6 +52,15 @@ export default function LibraryPage() {
     return () => {
       isSubscribed = false;
     };
+  }, []);
+
+  // Deep link from the header Search action: /library?focus=search
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('focus') === 'search') {
+      searchInputRef.current?.focus();
+    }
   }, []);
 
   const refreshRecords = async () => {
@@ -108,8 +117,6 @@ export default function LibraryPage() {
         aria-label="Import Videos"
       />
 
-      <BrandHeader className="md:hidden" />
-
       {/* Header (Screen 4) */}
       <div className="flex items-center justify-between h-11">
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">Library</h1>
@@ -124,26 +131,29 @@ export default function LibraryPage() {
 
       {/* Search Bar (Screen 4) */}
       <div className="relative flex items-center">
-        <Search className="w-4 h-4 text-[var(--t3)] absolute left-4 pointer-events-none" />
+        <Search className="w-4 h-4 text-[var(--t3)] absolute left-3.5 pointer-events-none" />
         <input
-          type="text"
+          ref={searchInputRef}
+          type="search"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search your videos"
-          className="w-full h-12 rounded-[25px] bg-[var(--es)] border border-[var(--bd)] pl-11 pr-4 text-sm text-[var(--tx)] placeholder-[var(--t3)] focus:border-[var(--bv)] focus:outline-none transition-colors"
+          aria-label="Search your videos"
+          className="w-full h-11 sm:h-12 rounded-[22px] bg-[var(--es)] border border-[var(--bd)] pl-11 pr-4 text-sm text-[var(--tx)] placeholder-[var(--t3)] focus:border-[var(--bv)] focus:outline-none transition-colors"
         />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
-            className="absolute right-4 text-xs text-[var(--t3)] hover:text-white"
+            aria-label="Clear search"
+            className="absolute right-3 grid h-8 w-8 place-items-center rounded-full text-[var(--t3)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bv)]"
           >
-            Clear
+            <X className="w-4 h-4" />
           </button>
         )}
       </div>
 
       {/* Filter Tabs (Screen 4: Recent, Favorites, Playlists, Sort) */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div className="flex w-full items-center gap-2 overflow-x-auto pb-1 no-scrollbar" role="tablist" aria-label="Library filters">
         <button
           onClick={() => setActiveTab('recent')}
           className={`chip ${activeTab === 'recent' ? 'on' : ''}`}

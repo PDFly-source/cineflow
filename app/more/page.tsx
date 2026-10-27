@@ -17,7 +17,6 @@ import {
   ShieldAlert,
   Calendar,
 } from 'lucide-react';
-import { BrandHeader } from '@/components/brand/Logo';
 import { TransferModal } from '@/components/transfer/TransferModal';
 import { Mp3ConverterModal } from '@/components/library/Mp3ConverterModal';
 import {
@@ -79,7 +78,6 @@ export default function MorePage() {
 
   return (
     <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-8 nav-clearance">
-      <BrandHeader className="md:hidden" />
 
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">More</h1>

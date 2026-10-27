@@ -48,7 +48,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   return (
     <aside
       aria-label="CineFlow Launch Screen"
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--ob)] p-6 transition-opacity duration-400 select-none ${
+      className={`fixed inset-0 z-50 flex w-screen flex-col items-center justify-center overflow-hidden bg-[var(--ob)] p-6 transition-opacity duration-400 select-none ${
         isFading ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
       onClick={() => {
@@ -60,7 +60,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         }, 200);
       }}
     >
-      <div className="flex flex-col items-center justify-center gap-8 text-center max-w-sm">
+      <div className="flex w-full max-w-sm flex-col items-center justify-center gap-8 text-center">
         <LogoSplash />
         <p className="text-xs sm:text-sm font-extrabold tracking-[0.22em] text-[var(--t2)] uppercase pt-4">
           YOUR VIDEOS. YOUR DEVICE. YOUR CONTROL.

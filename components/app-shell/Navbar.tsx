@@ -4,16 +4,44 @@ import React, { useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutGrid, FolderOpen, Film, Library, ListMusic, Settings, ShieldCheck, Activity } from 'lucide-react';
+  LayoutGrid,
+  FolderOpen,
+  Film,
+  Library,
+  ListMusic,
+  Settings,
+  ShieldCheck,
+  Activity,
+  Search,
+  History,
+} from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useMedia } from '@/context/MediaSessionContext';
-import { LogoIcon, LogoWordmark } from '@/components/brand/Logo';
+import { LogoIcon } from '@/components/brand/Logo';
+
+const NAV_LINKS = [
+  { label: 'Player', href: '/player', icon: Film },
+  { label: 'Library', href: '/library', icon: Library },
+  { label: 'Playlists', href: '/playlists', icon: ListMusic },
+  { label: 'Diagnostics', href: '/diagnostics', icon: Activity },
+  { label: 'More', href: '/more', icon: LayoutGrid },
+  { label: 'Settings', href: '/settings', icon: Settings },
+  { label: 'Privacy', href: '/privacy', icon: ShieldCheck },
+];
+
+/** Compact 36px circular icon action used in the header utility zone. */
+const headerIconLink =
+  'grid h-9 w-9 place-items-center rounded-full border border-[var(--bd)] bg-white/[0.04] text-[var(--t2)] transition-colors hover:border-[var(--ev)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ev)] active:scale-95';
 
 export const Navbar: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
-  const { selectFiles, currentItem } = useMedia();
+  const { selectFiles } = useMedia();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // GitHub Pages static export uses trailingSlash: true, so pathname arrives
+  // as '/player/' — normalize before comparing (same fix as BottomPillNav).
+  const normalizedPath = pathname.replace(/\/+$/, '');
 
   const handleOpenVideoClick = () => {
     fileInputRef.current?.click();
@@ -28,17 +56,7 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const navLinks = [
-    { label: 'Player', href: '/player', icon: Film },
-    { label: 'Library', href: '/library', icon: Library },
-    { label: 'Playlists', href: '/playlists', icon: ListMusic },
-    { label: 'Diagnostics', href: '/diagnostics', icon: Activity },
-    { label: 'More', href: '/more', icon: LayoutGrid },
-    { label: 'Settings', href: '/settings', icon: Settings },
-    { label: 'Privacy', href: '/privacy', icon: ShieldCheck },
-  ];
-
-  const isPlayerPage = pathname === '/player';
+  const isPlayerPage = normalizedPath === '/player';
 
   return (
     <>
@@ -54,32 +72,34 @@ export const Navbar: React.FC = () => {
       />
 
       <header
-        className={`sticky top-0 z-40 w-full border-b border-[var(--bd)] bg-[var(--ob)]/90 backdrop-blur-md transition-all ${
+        className={`sticky top-0 z-40 w-full border-b border-[var(--bd)]/80 bg-[var(--ob)]/85 backdrop-blur-md ${
           isPlayerPage ? 'hidden sm:block' : 'block'
         }`}
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
-          {/* Zone 1: Brand Wordmark with Exact Sprite Logo */}
+        <div className="mx-auto flex h-12 max-w-7xl items-center justify-between gap-3 px-3 sm:h-14 sm:px-6 lg:px-8">
+          {/* Zone 1: Brand — logo mark + compact wordmark on the left */}
           <Link
             href="/"
-            className="flex items-center gap-2.5 text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ev)] rounded-xl p-1"
+            aria-label="CineFlow home"
+            className="flex shrink-0 items-center gap-2 rounded-xl p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ev)]"
           >
-            <LogoIcon className="group-hover:scale-105 transition-transform" />
-            <LogoWordmark className="group-hover:opacity-90 transition-opacity" />
+            <LogoIcon className="ic-sm group-hover:scale-105 transition-transform" />
+            <span className="whitespace-nowrap text-[15px] font-extrabold tracking-tight text-white sm:text-base">
+              Cine<span className="text-[var(--cy)]">Flow</span>
+            </span>
           </Link>
 
-          {/* Zone 2: Navigation Links (Desktop) */}
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-[var(--t2)]">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
+          {/* Zone 2: Navigation Links (large screens only — keeps tablets on icon actions) */}
+          <nav className="hidden lg:flex items-center gap-5 text-[13px] font-semibold text-[var(--t2)]">
+            {NAV_LINKS.map((link) => {
+              const isActive = normalizedPath === link.href;
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`transition-colors whitespace-nowrap shrink-0 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ev)] rounded-md ${
-                    isActive
-                      ? 'text-white font-bold'
-                      : 'text-[var(--t2)] hover:text-white'
+                  className={`whitespace-nowrap rounded-md py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ev)] ${
+                    isActive ? 'font-bold text-white' : 'hover:text-white'
                   }`}
                 >
                   {link.label}
@@ -88,17 +108,46 @@ export const Navbar: React.FC = () => {
             })}
           </nav>
 
-          {/* Zone 3: Primary Action & Install Button */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Zone 3: Compact utility actions on the right */}
+          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+            <Link
+              href="/library?focus=search"
+              aria-label="Search your library"
+              title="Search"
+              className={headerIconLink}
+            >
+              <Search className="h-[17px] w-[17px]" />
+            </Link>
+
+            <Link
+              href="/library"
+              aria-label="Recently played videos"
+              title="Recent"
+              className={headerIconLink}
+            >
+              <History className="h-[17px] w-[17px]" />
+            </Link>
+
             <PWAInstallButton className="hidden sm:flex" />
 
+            {/* Open Video: compact icon-button on phones, labelled on larger screens */}
             <button
               onClick={handleOpenVideoClick}
-              className="btn pri h-10 px-4 rounded-xl text-xs font-bold text-white shadow-md active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bv)] whitespace-nowrap shrink-0"
+              aria-label="Open Video"
+              title="Open Video"
+              className={`${headerIconLink} sm:hidden`}
             >
-              <FolderOpen className="h-4 w-4" />
-              <span>Open Video</span>
+              <FolderOpen className="h-[17px] w-[17px]" />
             </button>
+            <span className="hidden sm:block" aria-hidden="true">
+              <button
+                onClick={handleOpenVideoClick}
+                className="btn pri h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 text-xs font-bold text-white transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bv)]"
+              >
+                <FolderOpen className="h-4 w-4" />
+                <span>Open Video</span>
+              </button>
+            </span>
           </div>
         </div>
       </header>

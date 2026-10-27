@@ -99,6 +99,14 @@ svg.i {
   background-position: 51% 74.5%;
 }
 
+/* Compact logo mark for the app header (28px, same sprite crop) */
+.ic-sm {
+  width: 28px;
+  height: 28px;
+  background-size: 314.3%;
+  background-position: 35.9% 29.3%;
+}
+
 .logo-splash {
   width: 290px;
   height: 290px;

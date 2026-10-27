@@ -48,28 +48,31 @@ export const VideoLibraryItem: React.FC<VideoLibraryItemProps> = ({
           {record.completed ? <Film className="w-4 h-4 text-[var(--cy)]" /> : <Play className="w-4 h-4 text-[var(--cy)]" />}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
+          <p className="text-sm font-semibold text-white truncate">
             {formatVideoTitle(title)}
             {record.hidden === true && <span className="ml-2 text-[10px] uppercase tracking-wider text-[var(--t3)]">Hidden</span>}
           </p>
-          <div className="flex items-center gap-2 text-xs text-[var(--t3)] mt-0.5">
-            <span>{formatTime(record.duration)}</span>
-            <span>·</span>
+          <div
+            className="mt-0.5 flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-[var(--t3)]"
+            aria-label={`Duration ${formatTime(record.duration)}, size ${formatFileSize(record.fileSize)}, last played ${formatDate(record.lastPlayedAt)}`}
+          >
+            <span className="text-[var(--t2)] font-semibold">{formatTime(record.duration)}</span>
+            <span aria-hidden="true">·</span>
             <span>{formatFileSize(record.fileSize)}</span>
-            <span>·</span>
+            <span aria-hidden="true">·</span>
             <span>{formatDate(record.lastPlayedAt)}</span>
             {record.mediaInfo?.width ? (
               <>
-                <span>·</span>
-                <span>{record.mediaInfo.width}×{record.mediaInfo.height}</span>
+                <span aria-hidden="true">·</span>
+                <span className="hidden min-[380px]:inline">{record.mediaInfo.width}×{record.mediaInfo.height}</span>
               </>
             ) : null}
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
-        <span className="font-mono text-xs text-[var(--cy)] font-semibold">{record.progressPercent}%</span>
+      <div className="flex items-center gap-1 shrink-0">
+        <span className="hidden min-[340px]:inline font-mono text-xs text-[var(--cy)] font-semibold tabular-nums">{record.progressPercent}%</span>
         <button
           onClick={(e) => {
             e.stopPropagation();
