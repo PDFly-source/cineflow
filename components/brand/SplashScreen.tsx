@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { LogoSplash } from './Logo';
+import { CineFlowLogo } from './Logo';
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -61,7 +61,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       }}
     >
       <div className="flex w-full max-w-sm flex-col items-center justify-center gap-8 text-center">
-        <LogoSplash />
+        <CineFlowLogo className="h-40 w-40 rounded-[28px] shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_90px_rgba(105,85,255,0.28)] sm:h-44 sm:w-44" />
         <p className="text-xs sm:text-sm font-extrabold tracking-[0.22em] text-[var(--t2)] uppercase pt-4">
           YOUR VIDEOS. YOUR DEVICE. YOUR CONTROL.
         </p>

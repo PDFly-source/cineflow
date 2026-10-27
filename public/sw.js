@@ -9,11 +9,12 @@ const PRECACHE_ASSETS = [
   `${BASE_PATH}/privacy/`,
   `${BASE_PATH}/offline.html`,
   `${BASE_PATH}/manifest.json`,
-  `${BASE_PATH}/icon.svg`,
   `${BASE_PATH}/pwa-192x192.png`,
   `${BASE_PATH}/pwa-512x512.png`,
+  `${BASE_PATH}/maskable-512x512.png`,
   `${BASE_PATH}/apple-touch-icon.png`,
-  `${BASE_PATH}/favicon.ico`
+  `${BASE_PATH}/favicon.ico`,
+  `${BASE_PATH}/brand/cineflow-logo.png`
 ];
 
 self.addEventListener('install', (event) => {

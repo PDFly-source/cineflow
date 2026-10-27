@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useMedia } from '@/context/MediaSessionContext';
-import { LogoIcon } from '@/components/brand/Logo';
+import { CineFlowLogo } from '@/components/brand/Logo';
 
 const NAV_LINKS = [
   { label: 'Player', href: '/player', icon: Film },
@@ -82,12 +82,9 @@ export const Navbar: React.FC = () => {
           <Link
             href="/"
             aria-label="CineFlow home"
-            className="flex shrink-0 items-center gap-2 rounded-xl p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ev)]"
+            className="flex shrink-0 items-center rounded-xl p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ev)]"
           >
-            <LogoIcon className="ic-sm group-hover:scale-105 transition-transform" />
-            <span className="whitespace-nowrap text-[15px] font-extrabold tracking-tight text-white sm:text-base">
-              Cine<span className="text-[var(--cy)]">Flow</span>
-            </span>
+            <CineFlowLogo className="h-9 w-9 shadow-[0_0_0_1px_rgba(255,255,255,0.06)] sm:h-10 sm:w-10" />
           </Link>
 
           {/* Zone 2: Navigation Links (large screens only — keeps tablets on icon actions) */}

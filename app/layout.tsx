@@ -26,10 +26,7 @@ export const metadata: Metadata = {
     title: 'CineFlow',
   },
   icons: {
-    icon: [
-      { url: '/cineflow/favicon.ico', sizes: '32x32' },
-      { url: '/cineflow/icon.svg', type: 'image/svg+xml' },
-    ],
+    icon: [{ url: '/cineflow/favicon.ico', sizes: '32x32' }],
     apple: [
       { url: '/cineflow/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],

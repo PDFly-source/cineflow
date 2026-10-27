@@ -31,10 +31,10 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: 'any',
       },
       {
-        src: `${BASE_PATH}/icon.svg`,
-        sizes: 'any',
-        type: 'image/svg+xml',
-        purpose: 'any',
+        src: `${BASE_PATH}/maskable-512x512.png`,
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
       },
     ],
   };
