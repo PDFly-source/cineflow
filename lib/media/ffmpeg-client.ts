@@ -37,12 +37,13 @@ interface Engine {
 
 let enginePromise: Promise<Engine> | null = null;
 
-function coreUrls(): { coreURL: string; wasmURL: string } {
+function coreUrls(): { coreURL: string; wasmURL: string; classWorkerURL: string } {
   const base = (process.env.NEXT_PUBLIC_BASE_PATH ?? '') + '/ffmpeg';
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   return {
     coreURL: origin + base + '/ffmpeg-core.js',
     wasmURL: origin + base + '/ffmpeg-core.wasm',
+    classWorkerURL: origin + base + '/ffmpeg-worker.js',
   };
 }
 
@@ -103,11 +104,17 @@ export async function getEngine(): Promise<Engine> {
       const { FFmpeg: FFmpegClass } = await import('@ffmpeg/ffmpeg');
       const ffmpeg = new FFmpegClass();
       ffmpeg.on('log', ({ message }) => appendLog(message));
-      const { coreURL, wasmURL } = coreUrls();
+      const { coreURL, wasmURL, classWorkerURL } = coreUrls();
       try {
-        await ffmpeg.load({ coreURL, wasmURL });
+        // @ffmpeg/ffmpeg 0.12.10+ resolves its worker from import.meta.url,
+        // which breaks under the Next.js bundle (worker chunk 404s). Serve the
+        // wrapper's worker + its imports from /ffmpeg/ and pass classWorkerURL.
+        await ffmpeg.load({ classWorkerURL, coreURL, wasmURL });
       } catch (err) {
         enginePromise = null;
+        // Keep the real cause visible for diagnostics; the user-facing message
+        // stays honest without leaking internals.
+        console.error('[cineflow] ffmpeg engine load failed:', err);
         throw new Error(
           'Could not load the local FFmpeg engine (offline or memory limits). ' +
             'Reload the page once while online so the conversion engine can be cached, then try again.'
@@ -200,15 +207,29 @@ export async function runConversion(opts: RunOptions): Promise<RunResult> {
   ffmpeg.on('log', progressHandler);
 
   try {
+    // WORKERFS/MEMFS mountpoints must exist as directories before use;
+    // Emscripten's FS.mount throws a bare ErrnoError otherwise.
+    try {
+      await ffmpeg.createDir(mountPoint);
+    } catch {
+      // already exists — fine
+    }
     try {
       // @ts-expect-error FFFSType enum comes from the package at runtime.
       await ffmpeg.mount('WORKERFS', { files: [opts.file] }, mountPoint);
       mounted = true;
-    } catch {
+    } catch (mountErr) {
       // Fallback: write the input into MEMFS (small files only, callers gate size).
-      const data = new Uint8Array(await opts.file.arrayBuffer());
-      await ffmpeg.writeFile(mountPoint + '/' + opts.file.name, data);
-      mounted = true;
+      try {
+        const data = new Uint8Array(await opts.file.arrayBuffer());
+        await ffmpeg.writeFile(mountPoint + '/' + opts.file.name, data);
+        mounted = true;
+      } catch (writeErr) {
+        // Worker rejections arrive as strings (e.toString()), not Error instances.
+        throw new Error(
+          'Could not stage the file for conversion (mount: ' + String(mountErr) + '; write: ' + String(writeErr) + ').'
+        );
+      }
     }
 
     let exitCode = 0;
@@ -226,7 +247,9 @@ export async function runConversion(opts: RunOptions): Promise<RunResult> {
       if (opts.isCancelled?.()) {
         throw new DOMException('Conversion cancelled', 'AbortError');
       }
-      throw err;
+      // Worker rejections are strings (e.toString()); keep the cause + log tail.
+      const tailText = tail.length ? '\n' + tail.slice(-8).join('\n') : '';
+      throw new Error('FFmpeg failed during conversion: ' + String(err) + tailText);
     }
     if (opts.isCancelled?.()) {
       throw new DOMException('Conversion cancelled', 'AbortError');
@@ -235,7 +258,12 @@ export async function runConversion(opts: RunOptions): Promise<RunResult> {
       throw new Error('FFmpeg exited with code ' + exitCode);
     }
 
-    const data = await ffmpeg.readFile(opts.outputName);
+    let data: Uint8Array | string;
+    try {
+      data = await ffmpeg.readFile(opts.outputName);
+    } catch (err) {
+      throw new Error('Conversion produced no readable output: ' + String(err));
+    }
     const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
     const blob = new Blob([bytes as unknown as BlobPart], { type: opts.outputMime });
     return { blob, logTail: tail };
@@ -245,6 +273,11 @@ export async function runConversion(opts: RunOptions): Promise<RunResult> {
       if (mounted) await ffmpeg.unmount(mountPoint);
     } catch {
       // worker may be gone after cancel
+    }
+    try {
+      await ffmpeg.deleteDir(mountPoint);
+    } catch {
+      // worker may be gone or dir still busy — harmless leftover
     }
     try {
       await ffmpeg.deleteFile?.(opts.outputName);

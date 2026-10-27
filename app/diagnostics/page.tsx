@@ -24,12 +24,9 @@ import type { EngineInfo } from '@/lib/media/ffmpeg-client';
 import { FileVideo, FlaskConical } from 'lucide-react';
 
 export default function DiagnosticsPage() {
-  const [report, setReport] = useState<DiagnosticsReport | null>(() => {
-    if (typeof window !== 'undefined') {
-      return runPlaybackDiagnostics();
-    }
-    return null;
-  });
+  // Initialize null on both server and client (SSR-safe), then fill in an
+  // effect so hydration always matches the static export's server HTML.
+  const [report, setReport] = useState<DiagnosticsReport | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [fileProbe, setFileProbe] = useState<MediaProbe | null>(null);
   const [filePlan, setFilePlan] = useState<ReturnType<typeof decidePlaybackPlan> | null>(null);
@@ -39,8 +36,9 @@ export default function DiagnosticsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!report) return;
-    augmentWithDecodingInfo(report).then((aug) => {
+    const initial = runPlaybackDiagnostics();
+    setReport(initial);
+    augmentWithDecodingInfo(initial).then((aug) => {
       if (!cancelled) setReport(aug);
     });
     return () => {

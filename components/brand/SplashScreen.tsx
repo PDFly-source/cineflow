@@ -12,13 +12,22 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   onComplete,
   autoDismissMs = 1200,
 }) => {
-  const [isVisible, setIsVisible] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return !sessionStorage.getItem('cineflow_splash_shown');
-    }
-    return false;
-  });
+  // Start hidden on both server and client so hydration always matches the
+  // static export's HTML; decide whether to show in a post-mount effect.
+  const [isVisible, setIsVisible] = useState<boolean>(false);
   const [isFading, setIsFading] = useState<boolean>(false);
+
+  useEffect(() => {
+    // First visit in this tab? Show the splash once, then remember it.
+    let alreadyShown = true;
+    try {
+      alreadyShown = !!sessionStorage.getItem('cineflow_splash_shown');
+    } catch {
+      // Private mode / storage disabled — skip the splash rather than loop it.
+      alreadyShown = true;
+    }
+    if (!alreadyShown) setIsVisible(true);
+  }, []);
 
   useEffect(() => {
     if (!isVisible) return;
