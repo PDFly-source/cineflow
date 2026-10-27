@@ -213,6 +213,22 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showABMenu, setShowABMenu] = useState(false);
   const scrubBarRef = useRef<HTMLDivElement>(null);
+
+  // Close every open menu when the overlay auto-hides so a menu cannot
+  // reappear stale when the controls come back.
+  // Render-phase reset (no effect) per React's "reset state on prop change".
+  const [wasVisible, setWasVisible] = useState(isVisible);
+  if (wasVisible !== isVisible) {
+    setWasVisible(isVisible);
+    if (!isVisible) {
+      setOrientationMenuOpen(false);
+      setShowSpeedMenu(false);
+      setShowFitMenu(false);
+      setShowSleepMenu(false);
+      setShowProfileMenu(false);
+      setShowABMenu(false);
+    }
+  }
   const [isScrubbing, setIsScrubbing] = useState(false);
 
   const seekToClientX = (clientX: number) => {
@@ -267,7 +283,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
       <div
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
-        className="flex items-center justify-between gap-3 pointer-events-auto"
+        className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-2 ${isVisible ? "pointer-events-auto" : "pointer-events-none"}`}
       >
         <div className="flex items-center gap-3 min-w-0">
           <Link
@@ -304,15 +320,16 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
         </div>
 
         {/* Top Right Tool Buttons */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Subtitles Chip (Screen 2: chip gl 'Subtitles EN') */}
           <button
             onClick={onOpenSubtitles}
             className="chip gl text-white hover:border-[var(--bv)] text-xs h-9 px-3"
             title="Subtitles & Timing"
+            aria-label="Subtitles & Timing"
           >
             <Subtitles className="w-3.5 h-3.5 text-[var(--cy)]" />
-            <span>{hasSubtitles && subtitlesActive ? 'Subtitles On' : 'Subtitles'}</span>
+            <span className="hidden sm:inline">{hasSubtitles && subtitlesActive ? 'Subtitles On' : 'Subtitles'}</span>
           </button>
 
           {/* Queue Drawer Button (Screen 2: rnd gl) */}
@@ -350,6 +367,27 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
             ) : (
               <Repeat className={`w-4 h-4 ${loopMode === 'all' ? 'text-[var(--bv)]' : 'text-slate-400'}`} />
             )}
+          </button>
+
+          {/* Direct flip toggles - same state as the popover chips, so they are
+              visible in the toolbar on phones instead of one menu level deep. */}
+          <button
+            onClick={onFlipHorizontal}
+            aria-pressed={orientation.flipH}
+            title="Flip horizontally"
+            aria-label="Flip horizontally"
+            className={`rnd gl text-white hover:border-[var(--bv)] ${orientation.flipH ? 'text-[var(--cy)] border-[var(--cy)]' : ''}`}
+          >
+            <FlipHorizontal className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onFlipVertical}
+            aria-pressed={orientation.flipV}
+            title="Flip vertically"
+            aria-label="Flip vertically"
+            className={`rnd gl text-white hover:border-[var(--bv)] ${orientation.flipV ? 'text-[var(--cy)] border-[var(--cy)]' : ''}`}
+          >
+            <FlipVertical className="w-4 h-4" />
           </button>
 
           {/* Orientation: rotate & flip popover (purely visual) */}
@@ -419,7 +457,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
       <div
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
-        className="pointer-events-auto flex items-center justify-center gap-10 sm:gap-14 select-none my-auto"
+        className={`${isVisible ? "pointer-events-auto" : "pointer-events-none"} flex items-center justify-center gap-10 sm:gap-14 select-none my-auto`}
       >
         <button
           onClick={() => onSkip(-seekInterval)}
@@ -457,7 +495,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
       <div
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
-        className="pointer-events-auto flex flex-col gap-3 select-none"
+        className={`${isVisible ? "pointer-events-auto" : "pointer-events-none"} flex flex-col gap-3 select-none`}
       >
         {/* Scrubber Timeline (Screen 2: .sl with cyan-to-violet gradient) */}
         <div
