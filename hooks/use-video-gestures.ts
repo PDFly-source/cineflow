@@ -32,6 +32,10 @@ export interface UseVideoGesturesProps {
   onTogglePlay: () => void;
   onToggleControls: () => void;
   onResetControlsTimer: () => void;
+  /** Element box the current display mode renders at zoom 1 (for pan clamping). */
+  videoBox?: { w: number; h: number };
+  /** Reports the current pan offset so the player can apply the transform. */
+  onPanChange?: (pan: { x: number; y: number }) => void;
 }
 
 export function useVideoGestures({
@@ -53,6 +57,8 @@ export function useVideoGestures({
   onTogglePlay,
   onToggleControls,
   onResetControlsTimer,
+  videoBox,
+  onPanChange,
 }: UseVideoGesturesProps) {
   // Feedback States for HUD Overlays
   const [gestureState, setGestureState] = useState<GestureType>('idle');
@@ -85,6 +91,9 @@ export function useVideoGestures({
     visible: false,
   });
   const [zoomScale, setZoomScale] = useState<number>(1.0);
+  const [pan, setPanState] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const panRef = useRef({ x: 0, y: 0 });
+  const panGestureStartRef = useRef<{ panX: number; panY: number; startX: number; startY: number } | null>(null);
   const [doubleTapRipples, setDoubleTapRipples] = useState<DoubleTapFeedbackState[]>([]);
 
   // Internal Gesture Tracking Refs
@@ -141,15 +150,49 @@ export function useVideoGestures({
     };
   }, []);
 
-  // Reset zoom action
+  // Clamped pan setter - the zoomed video box may never leave the container
+  const setPan = useCallback(
+    (next: { x: number; y: number }) => {
+      const container = containerRef.current;
+      const cw = container ? container.clientWidth : 0;
+      const ch = container ? container.clientHeight : 0;
+      const box = videoBox ?? { w: cw, h: ch };
+      const maxX = Math.max(0, (currentZoomScaleRef.current * box.w - cw) / 2);
+      const maxY = Math.max(0, (currentZoomScaleRef.current * box.h - ch) / 2);
+      const clamped = {
+        x: Math.round(Math.min(maxX, Math.max(-maxX, next.x))),
+        y: Math.round(Math.min(maxY, Math.max(-maxY, next.y))),
+      };
+      panRef.current = clamped;
+      setPanState(clamped);
+      onPanChange?.(clamped);
+    },
+    [containerRef, videoBox, onPanChange]
+  );
+
+  const applyZoom = useCallback(
+    (next: number) => {
+      const clamped = Math.max(1.0, Math.min(3.0, parseFloat(next.toFixed(2))));
+      currentZoomScaleRef.current = clamped;
+      setZoomScale(clamped);
+      setZoomFeedback({ scale: clamped, visible: true });
+      // Keep pan within the new bounds (also re-centres at zoom 1).
+      setPan(panRef.current);
+      return clamped;
+    },
+    [setPan]
+  );
+
+  // Reset zoom action (also re-centres the pan)
   const resetZoom = useCallback(() => {
     currentZoomScaleRef.current = 1.0;
     setZoomScale(1.0);
     setZoomFeedback({ scale: 1.0, visible: true });
+    setPan({ x: 0, y: 0 });
     setTimeout(() => {
       setZoomFeedback((prev) => (prev.scale === 1.0 ? { ...prev, visible: false } : prev));
     }, 1200);
-  }, []);
+  }, [setPan]);
 
   // Helper to determine touch zone
   const getHorizontalZone = (x: number, width: number): 'left' | 'right' | 'center' => {
@@ -306,6 +349,41 @@ export function useVideoGestures({
       const absDeltaX = Math.abs(deltaX);
       const absDeltaY = Math.abs(deltaY);
 
+      // While zoomed in, a single-pointer drag pans the video instead of
+      // seeking or adjusting brightness/volume (no gesture conflicts).
+      // Pan is computed absolutely from the gesture start so the ptr.x
+      // bookkeeping above cannot zero out the delta.
+      if (gestureTypeRef.current === 'pending_tap' && currentZoomScaleRef.current > 1) {
+        if (absDeltaX > sensitivity.slop || absDeltaY > sensitivity.slop) {
+          if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+          }
+          gestureTypeRef.current = 'pan';
+          setGestureState('pan');
+          panGestureStartRef.current = {
+            panX: panRef.current.x,
+            panY: panRef.current.y,
+            startX: ptr.startX,
+            startY: ptr.startY,
+          };
+          const gs = panGestureStartRef.current;
+          setPan({ x: gs.panX + (currentX - gs.startX), y: gs.panY + (currentY - gs.startY) });
+        }
+        return;
+      }
+
+      if (gestureTypeRef.current === 'pan') {
+        const gs = panGestureStartRef.current ?? {
+          panX: panRef.current.x,
+          panY: panRef.current.y,
+          startX: ptr.startX,
+          startY: ptr.startY,
+        };
+        setPan({ x: gs.panX + (currentX - gs.startX), y: gs.panY + (currentY - gs.startY) });
+        return;
+      }
+
       // Lock into gesture once slop is crossed
       if (gestureTypeRef.current === 'pending_tap') {
         if (absDeltaX > sensitivity.slop || absDeltaY > sensitivity.slop) {
@@ -401,6 +479,7 @@ export function useVideoGestures({
     [
       containerRef,
       sensitivity,
+      setPan,
       settings.horizontalSeekGesture,
       settings.brightnessGesture,
       settings.volumeGesture,
@@ -474,6 +553,13 @@ export function useVideoGestures({
         setTimeout(() => {
           setVolumeFeedback((prev) => ({ ...prev, visible: false }));
         }, 800);
+        gestureTypeRef.current = 'idle';
+        setGestureState('idle');
+        onResetControlsTimer();
+        return;
+      }
+
+      if (gestureTypeRef.current === 'pan') {
         gestureTypeRef.current = 'idle';
         setGestureState('idle');
         onResetControlsTimer();
@@ -568,6 +654,11 @@ export function useVideoGestures({
             if (settings.centerDoubleTapAction === 'play_pause') {
               onTogglePlay();
               triggerHaptic(20);
+            } else if (settings.centerDoubleTapAction === 'zoom') {
+              // Toggle between normal fit and the configured zoom level.
+              const target = currentZoomScaleRef.current > 1 ? 1 : Math.max(1, Math.min(3, settings.doubleTapZoomLevel || 2));
+              applyZoom(target);
+              triggerHaptic(20);
             }
           }
 
@@ -607,6 +698,8 @@ export function useVideoGestures({
       settings.doubleTapGesture,
       settings.seekInterval,
       settings.centerDoubleTapAction,
+      settings.doubleTapZoomLevel,
+      applyZoom,
       currentTime,
       duration,
       onSeek,
@@ -666,6 +759,8 @@ export function useVideoGestures({
   return {
     gestureState,
     zoomScale,
+    pan,
+    applyZoom,
     brightnessFeedback: effectiveBrightnessFeedback,
     volumeFeedback: effectiveVolumeFeedback,
     seekFeedback,

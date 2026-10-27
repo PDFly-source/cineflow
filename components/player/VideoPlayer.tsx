@@ -27,6 +27,8 @@ import {
   requestScreenRotation,
   ROTATE_SCREEN_FALLBACK_MESSAGE,
 } from '@/lib/player/screen-orientation';
+import { fitBiasScale, modeBaseBox } from '@/lib/player/display-modes';
+import { type VideoZoomApi } from '@/components/player/gestures/VideoGestureSurface';
 import { useMediaSession } from '@/hooks/use-media-session';
 import { Loader2, AlertCircle, FolderOpen, Film, Play, Sparkles, Activity } from 'lucide-react';
 import { VideoFitMode } from '@/lib/storage/db';
@@ -86,6 +88,8 @@ export const VideoPlayer: React.FC = () => {
   // In-player brightness (40% to 160%)
   const [brightness, setBrightness] = useState<number>(100);
   const [zoomScale, setZoomScale] = useState<number>(1.0);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
   // Visual video rotation - playback state is untouched.
   const [orientationState, setOrientationState] = useState<{ mediaUrl?: string; value: VideoOrientation }>({
     value: DEFAULT_ORIENTATION,
@@ -535,15 +539,50 @@ export const VideoPlayer: React.FC = () => {
     clearSavedProgress();
   };
 
+  // Display mode selection persists the preference (local settings only).
+  const handleSetFitMode = useCallback((mode: VideoFitMode) => {
+    setFitMode(mode);
+    updateSettings({ defaultFit: mode });
+  }, [setFitMode, updateSettings]);
+
+  // Zoom commands from the display sheet (+/-/reset): direct imperative calls
+  // into the gesture surface, so no command state round-trips through render.
+  const zoomApiRef = useRef<VideoZoomApi | null>(null);
+  const fireZoomCommand = useCallback((action: 'in' | 'out' | 'reset') => {
+    if (!zoomApiRef.current) return;
+    if (action === 'in') zoomApiRef.current.zoomIn();
+    else if (action === 'out') zoomApiRef.current.zoomOut();
+    else zoomApiRef.current.resetZoom();
+  }, []);
+
+  // Element box the current display mode renders at zoom 1 (pan clamping).
+  const quarterRotated = orientation.rotate === 90 || orientation.rotate === 270;
+  const videoBox = modeBaseBox(
+    fitMode,
+    { w: containerSize.w, h: containerSize.h },
+    quarterRotated ? videoNaturalSize.h : videoNaturalSize.w,
+    quarterRotated ? videoNaturalSize.w : videoNaturalSize.h
+  );
+
+  // Reset zoom + pan when the display mode changes or a different video opens
+  // (default per spec: fresh view per video).
+  useEffect(() => {
+    zoomApiRef.current?.resetZoom();
+  }, [fitMode, currentItem?.objectUrl]);
+
   // Video Fit Mode CSS class
   const getFitStyle = (): { className: string; style?: React.CSSProperties } => {
     switch (fitMode) {
       case 'cover':
         return { className: 'w-full h-full object-cover' };
+      case 'crop':
+        // Cover + fixed magnification (fitBiasScale) - still never distorts.
+        return { className: 'w-full h-full object-cover' };
       case 'fill':
         return { className: 'w-full h-full object-fill' };
       case 'original':
-        return { className: 'max-w-none max-h-none object-none m-auto' };
+        // Natural pixel size, shrunk only when larger than the viewport.
+        return { className: 'max-w-full max-h-full w-auto h-auto m-auto' };
       case 'contain':
       default:
         return { className: 'w-full h-full object-contain' };
@@ -655,7 +694,8 @@ export const VideoPlayer: React.FC = () => {
               : `brightness(${brightness}%)`,
           transform: composeTransform(
             orientation,
-            zoomScale * rotationFitScale(videoNaturalSize.w, videoNaturalSize.h, containerSize.w, containerSize.h, orientation)
+            zoomScale * fitBiasScale(fitMode) * rotationFitScale(videoNaturalSize.w, videoNaturalSize.h, containerSize.w, containerSize.h, orientation),
+            pan
           ),
           transformOrigin: 'center center',
           ...fit.style,
@@ -795,6 +835,9 @@ export const VideoPlayer: React.FC = () => {
         onToggleControls={() => setControlsVisible((prev) => !prev)}
         onResetControlsTimer={resetAutoHideTimer}
         onZoomChange={setZoomScale}
+        onPanChange={setPan}
+        videoBox={videoBox}
+        zoomApiRef={zoomApiRef}
       />
 
       {/* Controls Overlay */}
@@ -841,7 +884,11 @@ export const VideoPlayer: React.FC = () => {
         onTogglePiP={togglePiP}
         isPiPSupported={isPiPSupported}
         onChangeSpeed={setPlaybackSpeed}
-        onChangeFitMode={setFitMode}
+        onChangeFitMode={handleSetFitMode}
+        zoomScale={zoomScale}
+        onZoomIn={() => fireZoomCommand('in')}
+        onZoomOut={() => fireZoomCommand('out')}
+        onResetZoom={() => fireZoomCommand('reset')}
         onToggleLoop={toggleLoop}
         orientation={orientation}
         onRotateClockwise={() => applyOrientation(rotateClockwise(orientation))}

@@ -60,11 +60,11 @@ export interface SavedSubtitleRecord {
 export type SubtitleSize = 'small' | 'medium' | 'large' | 'extra-large';
 export type SubtitleFont = 'sans' | 'serif' | 'mono' | 'rounded';
 export type SubtitlePosition = 'bottom' | 'top' | 'middle';
-export type VideoFitMode = 'contain' | 'cover' | 'fill' | 'original';
+export type VideoFitMode = 'contain' | 'cover' | 'fill' | 'original' | 'crop';
 export type PlayerProfile = 'movie' | 'lecture' | 'bedtime';
 
 export type GestureSensitivity = 'low' | 'medium' | 'high';
-export type CenterDoubleTapAction = 'play_pause' | 'none';
+export type CenterDoubleTapAction = 'play_pause' | 'zoom' | 'none';
 
 export interface UserSettings {
   theme: 'dark' | 'light';
@@ -80,6 +80,8 @@ export interface UserSettings {
   longPressSpeed: number;
   pinchZoomGesture: boolean;
   centerDoubleTapAction: CenterDoubleTapAction;
+  /** Zoom level applied by the double-tap zoom toggle (1.5 - 3). */
+  doubleTapZoomLevel: number;
   gestureSensitivity: GestureSensitivity;
   hapticFeedback: boolean;
   defaultFit: VideoFitMode;
@@ -111,6 +113,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   longPressSpeed: 2.0,
   pinchZoomGesture: true,
   centerDoubleTapAction: 'play_pause',
+  doubleTapZoomLevel: 2.0,
   gestureSensitivity: 'medium',
   hapticFeedback: true,
   defaultFit: 'contain',

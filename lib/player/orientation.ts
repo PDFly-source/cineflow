@@ -42,10 +42,11 @@ export function isRotatedQuarter(o: VideoOrientation): boolean {
 
 /**
  * Composes the CSS transform string for the video element.
- * Deterministic order: zoom scale first, then rotation.
+ * Deterministic order: pan (screen px) first, then zoom scale, then rotation.
  */
-export function composeTransform(o: VideoOrientation, zoomScale = 1): string {
+export function composeTransform(o: VideoOrientation, zoomScale = 1, pan?: { x: number; y: number }): string {
   const parts: string[] = [];
+  if (pan && (pan.x !== 0 || pan.y !== 0)) parts.push(`translate(${pan.x}px, ${pan.y}px)`);
   if (zoomScale !== 1) parts.push(`scale(${zoomScale})`);
   if (o.rotate !== 0) parts.push(`rotate(${o.rotate}deg)`);
   return parts.length > 0 ? parts.join(' ') : 'none';

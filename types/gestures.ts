@@ -8,6 +8,7 @@ export type GestureType =
   | 'vertical_volume'
   | 'long_press_boost'
   | 'pinch_zoom'
+  | 'pan'
   | 'control_interaction';
 
 export interface GesturePointer {

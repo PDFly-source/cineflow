@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import Link from 'next/link';
+import { DISPLAY_MODES, displayModeOption, displayModeToVideoFit, videoFitToDisplayMode, ZOOM_MIN, ZOOM_MAX } from '@/lib/player/display-modes';
 import {
   Play,
   Pause,
@@ -9,6 +10,9 @@ import {
   RotateCw,
   RefreshCw,
   Smartphone,
+  Scaling,
+  ZoomIn,
+  ZoomOut,
   Volume2,
   Volume1,
   VolumeX,
@@ -92,6 +96,10 @@ interface ControlsOverlayProps {
   isPiPSupported: boolean;
   onChangeSpeed: (speed: number) => void;
   onChangeFitMode: (mode: VideoFitMode) => void;
+  zoomScale: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onResetZoom: () => void;
   onToggleLoop: () => void;
   orientation: VideoOrientation;
   onRotateClockwise: () => void;
@@ -115,13 +123,6 @@ const SLEEP_OPTIONS = [
   { label: '45 min', minutes: 45 },
   { label: '60 min', minutes: 60 },
   { label: '90 min', minutes: 90 },
-];
-
-const FIT_OPTIONS: { mode: VideoFitMode; label: string; desc: string }[] = [
-  { mode: 'contain', label: 'Contain', desc: 'Preserves original aspect with letterboxing' },
-  { mode: 'cover', label: 'Cover', desc: 'Fills viewport, cropping edges if needed' },
-  { mode: 'fill', label: 'Fill (Stretch)', desc: 'Fills viewport completely (may distort aspect)' },
-  { mode: 'original', label: 'Original 1:1', desc: 'Displays natural pixel dimensions centered' },
 ];
 
 const PROFILE_OPTIONS: { profile: PlayerProfile; label: string; icon: React.ReactNode; desc: string }[] = [
@@ -189,6 +190,10 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   isPiPSupported,
   onChangeSpeed,
   onChangeFitMode,
+  zoomScale,
+  onZoomIn,
+  onZoomOut,
+  onResetZoom,
   onToggleLoop,
   orientation,
   onRotateClockwise,
@@ -208,6 +213,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   const [hoverPosition, setHoverPosition] = useState<number>(0);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showFitMenu, setShowFitMenu] = useState(false);
+  const [displayMenuOpen, setDisplayMenuOpen] = useState(false);
   const [showSleepMenu, setShowSleepMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showABMenu, setShowABMenu] = useState(false);
@@ -223,6 +229,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
       setOrientationMenuOpen(false);
       setShowSpeedMenu(false);
       setShowFitMenu(false);
+      setDisplayMenuOpen(false);
       setShowSleepMenu(false);
       setShowProfileMenu(false);
       setShowABMenu(false);
@@ -260,6 +267,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   const closeAllMenus = () => {
     setShowSpeedMenu(false);
     setShowFitMenu(false);
+    setDisplayMenuOpen(false);
     setShowSleepMenu(false);
     setShowProfileMenu(false);
     setShowABMenu(false);
@@ -387,6 +395,82 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
           >
             <Smartphone className="w-4 h-4" />
           </button>
+
+          {/* Display modes & zoom (MX Player-style sheet) */}
+          <div className="relative">
+            {(() => {
+              const activeDisplay = displayModeOption(videoFitToDisplayMode(fitMode));
+              return (
+                <button
+                  onClick={() => setDisplayMenuOpen((v) => !v)}
+                  title={`Display: ${activeDisplay.short}`}
+                  aria-label="Display mode and zoom"
+                  aria-expanded={displayMenuOpen}
+                  className={`rnd gl text-white hover:border-[var(--bv)] ${activeDisplay.mode !== 'fit' ? 'border-[var(--cy)]' : ''}`}
+                >
+                  <Scaling className="w-4 h-4" />
+                </button>
+              );
+            })()}
+            {displayMenuOpen && (
+              <div
+                className="absolute top-12 right-0 z-20 w-60 rounded-2xl border border-[var(--bd)] bg-[var(--es)]/95 backdrop-blur-xl p-2 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <p className="px-2 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--t3)]">
+                  Display · {displayModeOption(videoFitToDisplayMode(fitMode)).short}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {DISPLAY_MODES.map((opt) => (
+                    <button
+                      key={opt.mode}
+                      onClick={() => onChangeFitMode(displayModeToVideoFit(opt.mode))}
+                      aria-pressed={fitMode === displayModeToVideoFit(opt.mode)}
+                      title={opt.desc}
+                      className={`chip gl text-[11px] h-9 px-2 justify-center ${
+                        fitMode === displayModeToVideoFit(opt.mode) ? 'text-[var(--cy)] border-[var(--cy)]' : 'text-white'
+                      }`}
+                    >
+                      {opt.short}
+                    </button>
+                  ))}
+                </div>
+                <p className="px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--t3)]">Zoom</p>
+                <div className="flex items-center gap-1.5 px-1 pb-1">
+                  <button
+                    onClick={onZoomOut}
+                    disabled={zoomScale <= ZOOM_MIN}
+                    title="Zoom out"
+                    aria-label="Zoom out"
+                    className="rnd gl text-white hover:border-[var(--bv)] disabled:opacity-40"
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </button>
+                  <span className="flex-1 text-center text-xs font-semibold text-white" aria-live="polite">
+                    {zoomScale.toFixed(2)}&times;
+                  </span>
+                  <button
+                    onClick={onZoomIn}
+                    disabled={zoomScale >= ZOOM_MAX}
+                    title="Zoom in"
+                    aria-label="Zoom in"
+                    className="rnd gl text-white hover:border-[var(--bv)] disabled:opacity-40"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={onResetZoom}
+                    disabled={zoomScale === ZOOM_MIN}
+                    title="Reset zoom"
+                    aria-label="Reset zoom"
+                    className="chip gl text-white text-[11px] h-9 px-2 justify-center disabled:opacity-40"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Video rotation popover (purely visual) */}
           <div className="relative">

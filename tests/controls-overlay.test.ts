@@ -66,6 +66,10 @@ function makeProps(overrides: Record<string, unknown> = {}) {
     isPiPSupported: false,
     onChangeSpeed: noop,
     onChangeFitMode: noop,
+    zoomScale: 1,
+    onZoomIn: noop,
+    onZoomOut: noop,
+    onResetZoom: noop,
     onToggleLoop: noop,
     orientation: { rotate: 0 } as never,
     onRotateClockwise: noop,
@@ -194,6 +198,87 @@ describe('phase 2.3 mobile orientation UI', () => {
       const interactiveBars = [...document.querySelectorAll('div')].filter((d) => (d.className || '').includes('pointer-events-auto'));
       assert.equal(interactiveBars.length, 0, 'no bar may stay interactive while overlay hidden');
     } finally { hidden.unmount(); }
+  });
+
+  test('display sheet lists all five modes with the active one highlighted', async () => {
+    let chosen: string | null = null;
+    const h = await renderOverlay(makeProps({
+      fitMode: 'cover' as never,
+      onChangeFitMode: (m: string) => { chosen = m; },
+    }));
+    try {
+      const trigger = document.querySelector('button[aria-label="Display mode and zoom"]') as unknown as HTMLButtonElement;
+      assert.ok(trigger, 'display trigger exists');
+      trigger.click();
+      await new Promise((r) => setTimeout(r, 30));
+
+      const chips = [...document.querySelectorAll('button[aria-pressed]')] as unknown as HTMLButtonElement[];
+      const modeChips = chips.filter((b) => ['Fit', 'Fill', 'Crop', 'Stretch', '100%'].includes((b.textContent || '').trim()));
+      assert.equal(modeChips.length, 5, 'five display modes listed');
+
+      const active = modeChips.find((b) => b.getAttribute('aria-pressed') === 'true');
+      assert.ok(active, 'active mode is marked');
+      assert.match(active!.getAttribute('title') || '', /crop overflow/i, 'cover shows Fill active');
+      assert.equal(trigger.title, 'Display: Fill', 'trigger shows the active mode');
+
+      // Switching to Crop passes the mapped fit mode to the player
+      const cropChip = modeChips.find((b) => b.textContent === 'Crop');
+      cropChip!.click();
+      await new Promise((r) => setTimeout(r, 20));
+      assert.equal(chosen, 'crop');
+    } finally { h.unmount(); }
+  });
+
+  test('zoom in/out/reset buttons are wired and the read-out updates', async () => {
+    const calls: string[] = [];
+    let zoom = 1;
+    const h = await renderOverlay(makeProps({
+      zoomScale: zoom,
+      onZoomIn: () => { calls.push('in'); zoom += 0.25; },
+      onZoomOut: () => { calls.push('out'); zoom -= 0.25; },
+      onResetZoom: () => { calls.push('reset'); zoom = 1; },
+    }));
+    try {
+      const trigger = document.querySelector('button[aria-label="Display mode and zoom"]') as unknown as HTMLButtonElement;
+      trigger.click();
+      await new Promise((r) => setTimeout(r, 30));
+
+      const zin = document.querySelector('button[aria-label="Zoom in"]') as unknown as HTMLButtonElement;
+      const zout = document.querySelector('button[aria-label="Zoom out"]') as unknown as HTMLButtonElement;
+      const zreset = document.querySelector('button[aria-label="Reset zoom"]') as unknown as HTMLButtonElement;
+      assert.ok(zin && zout && zreset, 'zoom buttons present');
+
+      assert.equal(zout.disabled, true, 'zoom out disabled at fit');
+      zin.click();
+      // Re-render with the zoomed prop the player would now hold
+      h.root.render(React.createElement(ControlsOverlay, makeProps({
+        zoomScale: 1.25,
+        onZoomIn: () => { calls.push('in'); zoom += 0.25; },
+        onZoomOut: () => { calls.push('out'); zoom -= 0.25; },
+        onResetZoom: () => { calls.push('reset'); zoom = 1; },
+      })));
+      await new Promise((r) => setTimeout(r, 30));
+      const zreset2 = document.querySelector('button[aria-label="Reset zoom"]') as unknown as HTMLButtonElement;
+      assert.equal(zreset2.disabled, false, 'reset enabled once zoomed');
+      zreset2.click();
+      assert.deepEqual(calls, ['in', 'reset'], 'handlers wired in order');
+    } finally { h.unmount(); }
+  });
+
+  test('display sheet closes when the overlay hides and cannot swallow taps', async () => {
+    const h = await renderOverlay(makeProps());
+    try {
+      const trigger = document.querySelector('button[aria-label="Display mode and zoom"]') as unknown as HTMLButtonElement;
+      trigger.click();
+      await new Promise((r) => setTimeout(r, 30));
+      assert.ok(document.querySelector('button[aria-label="Zoom in"]'), 'sheet open');
+
+      h.root.render(React.createElement(ControlsOverlay, makeProps({ isVisible: false })));
+      for (let i = 0; i < 100 && document.querySelector('button[aria-label="Zoom in"]'); i++) {
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      assert.equal(document.querySelector('button[aria-label="Zoom in"]'), null, 'sheet closed on hide');
+    } finally { h.unmount(); }
   });
 
   test('subtitles chip label is hidden below sm so the toolbar fits narrow phones', async () => {

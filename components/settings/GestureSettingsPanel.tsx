@@ -504,14 +504,30 @@ export const GestureSettingsPanel: React.FC<GestureSettingsPanelProps> = ({
               value={settings.centerDoubleTapAction || 'play_pause'}
               onChange={(e) =>
                 updateSettings({
-                  centerDoubleTapAction: e.target.value as 'play_pause' | 'none',
+                  centerDoubleTapAction: e.target.value as 'play_pause' | 'zoom' | 'none',
                 })
               }
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
             >
               <option value="play_pause">Toggle Play / Pause</option>
+              <option value="zoom">Toggle Zoom (fit &lt;-&gt; zoom level)</option>
               <option value="none">No Action (Ignore)</option>
             </select>
+            {settings.centerDoubleTapAction === 'zoom' && (
+              <div className="mt-2 space-y-1">
+                <label className="text-xs font-medium text-slate-300">Double-Tap Zoom Level</label>
+                <select
+                  value={settings.doubleTapZoomLevel || 2.0}
+                  onChange={(e) => updateSettings({ doubleTapZoomLevel: parseFloat(e.target.value) })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value={1.5}>1.5x</option>
+                  <option value={2}>2x</option>
+                  <option value={2.5}>2.5x</option>
+                  <option value={3}>3x</option>
+                </select>
+              </div>
+            )}
           </div>
 
           {/* 6. Long Press Boost Speed */}
