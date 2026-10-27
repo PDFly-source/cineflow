@@ -16,13 +16,17 @@ import {
   rotateClockwise,
   rotateCounterClockwise,
   rotate180,
-  flipHorizontal,
-  flipVertical,
   resetOrientation as resetOrientationState,
   composeTransform,
   rotationFitScale,
   type VideoOrientation,
 } from '@/lib/player/orientation';
+import {
+  getScreenOrientation,
+  releaseScreenOrientation,
+  requestScreenRotation,
+  ROTATE_SCREEN_FALLBACK_MESSAGE,
+} from '@/lib/player/screen-orientation';
 import { useMediaSession } from '@/hooks/use-media-session';
 import { Loader2, AlertCircle, FolderOpen, Film, Play, Sparkles, Activity } from 'lucide-react';
 import { VideoFitMode } from '@/lib/storage/db';
@@ -82,7 +86,7 @@ export const VideoPlayer: React.FC = () => {
   // In-player brightness (40% to 160%)
   const [brightness, setBrightness] = useState<number>(100);
   const [zoomScale, setZoomScale] = useState<number>(1.0);
-  // Visual orientation (rotation/flips) - playback state is untouched.
+  // Visual video rotation - playback state is untouched.
   const [orientationState, setOrientationState] = useState<{ mediaUrl?: string; value: VideoOrientation }>({
     value: DEFAULT_ORIENTATION,
   });
@@ -223,10 +227,43 @@ export const VideoPlayer: React.FC = () => {
     };
   }, [isPlaying, settings.autoHideDelay]);
 
+  // --- Real screen rotation (Screen Orientation API, Phase 2.3) ---
+  const [rotateScreenNotice, setRotateScreenNotice] = useState<string | null>(null);
+  const noticeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showRotateScreenNotice = useCallback((message: string) => {
+    setRotateScreenNotice(message);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => setRotateScreenNotice(null), 5000);
+  }, []);
+
+  const enterPlayerFullscreen = useCallback(async () => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (container.requestFullscreen) {
+      await container.requestFullscreen();
+    } else {
+      (container as unknown as { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen?.();
+    }
+  }, []);
+
+  // User-gesture entry point: attempts a real orientation lock (fullscreen
+  // first, as required by Android Chrome / installed PWAs). On any rejection
+  // or missing support we show the truthful fallback message instead of
+  // pretending the screen rotated.
+  const rotateScreen = useCallback(async () => {
+    const result = await requestScreenRotation(enterPlayerFullscreen, getScreenOrientation());
+    if (result === 'fallback') showRotateScreenNotice(ROTATE_SCREEN_FALLBACK_MESSAGE);
+  }, [enterPlayerFullscreen, showRotateScreenNotice]);
+
   // Listen to fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const wasFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(wasFullscreen);
+      // Leaving fullscreen also ends rotation mode: release the orientation
+      // lock so the device returns to normal portrait behaviour.
+      if (!wasFullscreen) releaseScreenOrientation(getScreenOrientation());
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -810,8 +847,8 @@ export const VideoPlayer: React.FC = () => {
         onRotateClockwise={() => applyOrientation(rotateClockwise(orientation))}
         onRotateCounterClockwise={() => applyOrientation(rotateCounterClockwise(orientation))}
         onRotate180={() => applyOrientation(rotate180(orientation))}
-        onFlipHorizontal={() => applyOrientation(flipHorizontal(orientation))}
-        onFlipVertical={() => applyOrientation(flipVertical(orientation))}
+        onRotateScreen={rotateScreen}
+        rotateScreenNotice={rotateScreenNotice}
         onResetOrientation={() => applyOrientation(resetOrientationState())}
         onPrevTrack={prevTrack}
         onNextTrack={nextTrack}

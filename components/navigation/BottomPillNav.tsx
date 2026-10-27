@@ -27,7 +27,9 @@ export const BottomPillNav: React.FC = () => {
   };
 
   // If in fullscreen video player, hide pill navigation to give full viewport to video
-  const isPlayerPage = pathname === '/player';
+  // With trailingSlash: true (GitHub Pages export) usePathname() returns
+  // '/player/', so compare against the normalized path.
+  const isPlayerPage = pathname.replace(/\/+$/, '') === '/player';
 
   return (
     <>
@@ -52,7 +54,10 @@ export const BottomPillNav: React.FC = () => {
       <nav
         aria-label="CineFlow Navigation"
         className={`pill select-none transition-all duration-300 ${
-          isPlayerPage ? 'opacity-0 pointer-events-none sm:opacity-100 sm:pointer-events-auto' : 'opacity-100'
+          // Hide on the player page at every width: landscape phones exceed
+          // the 640px breakpoint and the floating pill would otherwise sit
+          // over the player's bottom controls and swallow their taps.
+          isPlayerPage ? 'opacity-0 pointer-events-none' : 'opacity-100'
         }`}
       >
         {/* 1: Home */}

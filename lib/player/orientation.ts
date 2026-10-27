@@ -1,20 +1,17 @@
 /**
  * Pure video-orientation state model for the player.
- * Rotation and flips are purely visual transforms on the video element:
+ * Rotation is a purely visual transform on the video element:
  * playback position, audio, subtitles and speed are untouched, and the
- * physical device orientation is never forced.
+ * physical device orientation is never forced. Physical screen rotation
+ * (Phase 2.3) is handled separately via the Screen Orientation API.
  */
 
 export interface VideoOrientation {
   /** Clockwise rotation in degrees. */
   rotate: 0 | 90 | 180 | 270;
-  /** Mirror horizontally (applied in the rotated frame). */
-  flipH: boolean;
-  /** Mirror vertically (applied in the rotated frame). */
-  flipV: boolean;
 }
 
-export const DEFAULT_ORIENTATION: VideoOrientation = { rotate: 0, flipH: false, flipV: false };
+export const DEFAULT_ORIENTATION: VideoOrientation = { rotate: 0 };
 
 type Quarter = 0 | 90 | 180 | 270;
 
@@ -35,14 +32,6 @@ export function rotate180(o: VideoOrientation): VideoOrientation {
   return { ...o, rotate: normalize(o.rotate + 180) };
 }
 
-export function flipHorizontal(o: VideoOrientation): VideoOrientation {
-  return { ...o, flipH: !o.flipH };
-}
-
-export function flipVertical(o: VideoOrientation): VideoOrientation {
-  return { ...o, flipV: !o.flipV };
-}
-
 export function resetOrientation(): VideoOrientation {
   return { ...DEFAULT_ORIENTATION };
 }
@@ -53,15 +42,12 @@ export function isRotatedQuarter(o: VideoOrientation): boolean {
 
 /**
  * Composes the CSS transform string for the video element.
- * Deterministic order: zoom scale first, then rotation, then flips, so
- * flips always mirror the already-rotated frame.
+ * Deterministic order: zoom scale first, then rotation.
  */
 export function composeTransform(o: VideoOrientation, zoomScale = 1): string {
   const parts: string[] = [];
   if (zoomScale !== 1) parts.push(`scale(${zoomScale})`);
   if (o.rotate !== 0) parts.push(`rotate(${o.rotate}deg)`);
-  if (o.flipH) parts.push('scaleX(-1)');
-  if (o.flipV) parts.push('scaleY(-1)');
   return parts.length > 0 ? parts.join(' ') : 'none';
 }
 

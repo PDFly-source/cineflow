@@ -1,7 +1,7 @@
 /**
- * Regression tests for Phase 2.2: Flip H / Flip V must be visible toolbar
- * buttons on mobile (not only inside the "Rotate & flip" popover).
- * Uses happy-dom to render the real component and click the real buttons.
+ * Regression tests for Phase 2.3: flip controls fully removed, a visible
+ * Rotate Screen action in the mobile toolbar, and a truthful fallback
+ * notice. Uses happy-dom to render the real component and click buttons.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -67,12 +67,12 @@ function makeProps(overrides: Record<string, unknown> = {}) {
     onChangeSpeed: noop,
     onChangeFitMode: noop,
     onToggleLoop: noop,
-    orientation: { rotate: 0, flipH: false, flipV: false } as never,
+    orientation: { rotate: 0 } as never,
     onRotateClockwise: noop,
     onRotateCounterClockwise: noop,
     onRotate180: noop,
-    onFlipHorizontal: noop,
-    onFlipVertical: noop,
+    onRotateScreen: noop,
+    rotateScreenNotice: null,
     onResetOrientation: noop,
     onPrevTrack: noop,
     onNextTrack: noop,
@@ -92,83 +92,80 @@ async function renderOverlay(props: ReturnType<typeof makeProps>): Promise<{ roo
   return { root, unmount: () => { root.unmount(); host.remove(); } };
 }
 
-function toolbarFlipButtons(): HTMLButtonElement[] {
-  return [...document.querySelectorAll('button[aria-label="Flip horizontally"], button[aria-label="Flip vertically"]')] as unknown as HTMLButtonElement[];
-}
-
-describe('mobile flip toolbar buttons', () => {
-  test('Flip H and Flip V render as direct toolbar buttons (not popover-only)', async () => {
+describe('phase 2.3 mobile orientation UI', () => {
+  test('no flip controls exist anywhere in the overlay', async () => {
     const h = await renderOverlay(makeProps());
     try {
-      const btns = toolbarFlipButtons();
-      assert.equal(btns.length, 2, 'both flip buttons must exist in the toolbar');
-      // They must sit in the top bar tool cluster, above the popover (y < 200 in source order test: popover only renders when opened)
-      const chip = [...document.querySelectorAll('button[title="Subtitles & Timing"]')] as unknown as HTMLButtonElement[];
-      assert.equal(chip.length, 1);
-      const subs = chip[0];
-      const all = [...document.querySelectorAll('button')] as unknown as HTMLButtonElement[];
-      assert.ok(all.indexOf(subs) < all.indexOf(btns[0]), 'flip buttons come after the subtitles chip in the toolbar');
-      assert.ok(all.indexOf(btns[0]) < all.indexOf(btns[1]));
-      // not aria-pressed when orientation is clean
-      assert.equal(btns[0].getAttribute('aria-pressed'), 'false');
-      assert.equal(btns[1].getAttribute('aria-pressed'), 'false');
+      // Open the rotation popover too, so its contents are also checked
+      const trigger = document.querySelector('button[aria-label="Rotate video options"]') as unknown as HTMLButtonElement;
+      assert.ok(trigger, 'rotation popover trigger present');
+      trigger.click();
+      await new Promise((r) => setTimeout(r, 30));
+
+      const flipButtons = [...document.querySelectorAll('button')].filter((b) =>
+        /flip/i.test(b.title || b.getAttribute('aria-label') || '')
+      );
+      assert.equal(flipButtons.length, 0, 'no Flip buttons may remain');
+
+      const flipText = document.body.textContent?.toLowerCase() ?? '';
+      assert.ok(!flipText.includes('flip h'), 'no "Flip H" label');
+      assert.ok(!flipText.includes('flip v'), 'no "Flip V" label');
+      assert.ok(!flipText.includes('flip horizontally'), 'no "Flip horizontally" tooltip text');
+      assert.ok(!flipText.includes('flip vertically'), 'no "Flip vertically" tooltip text');
     } finally { h.unmount(); }
   });
 
-  test('clicking the toolbar buttons fires the flip handlers', async () => {
-    let flipsH = 0;
-    let flipsV = 0;
-    const h = await renderOverlay(makeProps({
-      onFlipHorizontal: () => { flipsH += 1; },
-      onFlipVertical: () => { flipsV += 1; },
-    }));
+  test('Rotate Screen button renders in the toolbar and fires the handler', async () => {
+    let taps = 0;
+    const h = await renderOverlay(makeProps({ onRotateScreen: () => { taps += 1; } }));
     try {
-      const [bh, bv] = toolbarFlipButtons();
-      bh.click();
-      bv.click();
+      const btn = document.querySelector('button[aria-label="Rotate screen"]') as unknown as HTMLButtonElement;
+      assert.ok(btn, 'Rotate Screen action must exist');
+      assert.equal(btn.title, 'Rotate screen');
+      btn.click();
       await new Promise((r) => setTimeout(r, 20));
-      assert.equal(flipsH, 1, 'Flip H button wired to onFlipHorizontal');
-      assert.equal(flipsV, 1, 'Flip V button wired to onFlipVertical');
+      assert.equal(taps, 1, 'Rotate Screen button wired to onRotateScreen');
     } finally { h.unmount(); }
   });
 
-  test('active flips are reflected via aria-pressed on the toolbar buttons', async () => {
-    const h = await renderOverlay(makeProps({
-      orientation: { rotate: 90, flipH: true, flipV: true },
-    }));
-    try {
-      const [bh, bv] = toolbarFlipButtons();
-      assert.equal(bh.getAttribute('aria-pressed'), 'true');
-      assert.equal(bv.getAttribute('aria-pressed'), 'true');
-    } finally { h.unmount(); }
-  });
-
-  test('popover still offers rotate/flip/reset and shares the same state', async () => {
+  test('rotation popover keeps CCW / CW / 180 / Reset and drops flips', async () => {
     const h = await renderOverlay(makeProps());
     try {
-      const trigger = document.querySelector('button[aria-label="Rotate and flip options"]') as unknown as HTMLButtonElement | null;
-      assert.ok(trigger, 'popover trigger still present');
-      trigger!.click();
-      await new Promise((r) => setTimeout(r, 20));
-      const chips = ([...document.querySelectorAll('button[title]')] as unknown as HTMLButtonElement[]).map((b) => b.getAttribute('title'));
-      for (const t of ['Rotate clockwise 90°', 'Rotate counter-clockwise 90°', 'Rotate 180°', 'Flip horizontally', 'Flip vertically', 'Reset orientation']) {
-        assert.ok(chips.includes(t), `popover still contains "${t}"`);
+      const trigger = document.querySelector('button[aria-label="Rotate video options"]') as unknown as HTMLButtonElement;
+      trigger.click();
+      await new Promise((r) => setTimeout(r, 30));
+      const titles = ([...document.querySelectorAll('button[title]')] as unknown as HTMLButtonElement[]).map((b) => b.getAttribute('title'));
+      for (const t of ['Rotate counter-clockwise 90°', 'Rotate clockwise 90°', 'Rotate 180°', 'Reset orientation']) {
+        assert.ok(titles.includes(t), `popover still contains "${t}"`);
       }
+      assert.ok(!titles.some((t) => /flip/i.test(t ?? '')), 'no flip chips in the popover');
     } finally { h.unmount(); }
+  });
+
+  test('fallback notice renders when provided and disappears when cleared', async () => {
+    const message = 'Rotate your phone to landscape; automatic rotation depends on your device settings.';
+    const h = await renderOverlay(makeProps({ rotateScreenNotice: message }));
+    try {
+      const status = document.querySelector('[role="status"]');
+      assert.ok(status, 'notice element exists');
+      assert.equal((status as unknown as HTMLElement).textContent, message);
+    } finally { h.unmount(); }
+
+    const h2 = await renderOverlay(makeProps({ rotateScreenNotice: null }));
+    try {
+      assert.equal(document.querySelector('[role="status"]'), null, 'no notice when none set');
+    } finally { h2.unmount(); }
   });
 
   test('open menus close when the overlay auto-hides so hidden panels cannot swallow taps', async () => {
     const h = await renderOverlay(makeProps());
     try {
-      // Open the orientation popover
-      const trigger = document.querySelector('button[aria-label="Rotate and flip options"]') as unknown as HTMLButtonElement;
-      assert.ok(trigger, 'popover trigger present');
+      const trigger = document.querySelector('button[aria-label="Rotate video options"]') as unknown as HTMLButtonElement;
       trigger.click();
       await new Promise((r) => setTimeout(r, 30));
       let chips = [...document.querySelectorAll('button[title="Rotate clockwise 90°"]')] as unknown as HTMLButtonElement[];
       assert.ok(chips.length > 0, 'popover chips render while overlay visible');
 
-      // Simulate auto-hide: re-render with isVisible=false and wait for the effect
       h.root.render(React.createElement(ControlsOverlay, makeProps({ isVisible: false })));
       for (let i = 0; i < 100 && chips.length > 0; i++) {
         await new Promise((r) => setTimeout(r, 20));
@@ -176,7 +173,6 @@ describe('mobile flip toolbar buttons', () => {
       }
       assert.equal(chips.length, 0, 'popover must close when controls hide');
 
-      // And it must stay closed when controls return
       h.root.render(React.createElement(ControlsOverlay, makeProps({ isVisible: true })));
       await new Promise((r) => setTimeout(r, 150));
       chips = [...document.querySelectorAll('button[title="Rotate clockwise 90°"]')] as unknown as HTMLButtonElement[];
@@ -185,8 +181,6 @@ describe('mobile flip toolbar buttons', () => {
   });
 
   test('control bars are non-interactive while the overlay is hidden (auto-hide tap-restore)', async () => {
-    // While hidden, taps must fall through to the gesture surface instead of
-    // hitting invisible bar buttons (which caused mystery pauses/seeks).
     const visible = await renderOverlay(makeProps());
     try {
       const topBar = [...document.querySelectorAll('div')].find((d) => (d.className || '').includes('justify-between') && (d.className || '').includes('flex-wrap')) as unknown as HTMLElement;
@@ -195,12 +189,10 @@ describe('mobile flip toolbar buttons', () => {
     } finally { visible.unmount(); }
     const hidden = await renderOverlay(makeProps({ isVisible: false }));
     try {
-      const bars = [...document.querySelectorAll('div.pointer-events-none')].filter((d) => (d.className || '').includes('justify-between') || (d.className || '').includes('flex-col gap-3'));
       const barsAll = [...document.querySelectorAll('div')].filter((d) => (d.className || '').includes('pointer-events-none'));
       assert.ok(barsAll.length >= 4, 'root + all three bars must be pointer-events-none when hidden');
       const interactiveBars = [...document.querySelectorAll('div')].filter((d) => (d.className || '').includes('pointer-events-auto'));
       assert.equal(interactiveBars.length, 0, 'no bar may stay interactive while overlay hidden');
-      assert.ok(bars.length >= 2, 'top and bottom bars present and non-interactive');
     } finally { hidden.unmount(); }
   });
 

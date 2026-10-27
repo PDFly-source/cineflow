@@ -7,9 +7,8 @@ import {
   Pause,
   RotateCcw,
   RotateCw,
-  FlipHorizontal,
-  FlipVertical,
   RefreshCw,
+  Smartphone,
   Volume2,
   Volume1,
   VolumeX,
@@ -98,8 +97,8 @@ interface ControlsOverlayProps {
   onRotateClockwise: () => void;
   onRotateCounterClockwise: () => void;
   onRotate180: () => void;
-  onFlipHorizontal: () => void;
-  onFlipVertical: () => void;
+  onRotateScreen: () => void;
+  rotateScreenNotice: string | null;
   onResetOrientation: () => void;
   onPrevTrack: () => void;
   onNextTrack: () => void;
@@ -195,8 +194,8 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   onRotateClockwise,
   onRotateCounterClockwise,
   onRotate180,
-  onFlipHorizontal,
-  onFlipVertical,
+  onRotateScreen,
+  rotateScreenNotice,
   onResetOrientation,
   onPrevTrack,
   onNextTrack,
@@ -279,6 +278,16 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
     >
+      {/* Rotate-screen fallback notice (truthful message, no fake rotation) */}
+      {rotateScreenNotice && (
+        <div
+          role="status"
+          className="pointer-events-none absolute bottom-24 left-1/2 z-30 -translate-x-1/2 max-w-[86%] rounded-2xl border border-[var(--bd)] bg-[var(--dn)]/95 px-4 py-2 text-center text-xs leading-relaxed text-white shadow-xl backdrop-blur-md"
+        >
+          {rotateScreenNotice}
+        </div>
+      )}
+
       {/* Top Bar (Screen 2) */}
       <div
         onPointerDown={(e) => e.stopPropagation()}
@@ -369,35 +378,24 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
             )}
           </button>
 
-          {/* Direct flip toggles - same state as the popover chips, so they are
-              visible in the toolbar on phones instead of one menu level deep. */}
+          {/* Rotate Screen: real device rotation via the Screen Orientation API */}
           <button
-            onClick={onFlipHorizontal}
-            aria-pressed={orientation.flipH}
-            title="Flip horizontally"
-            aria-label="Flip horizontally"
-            className={`rnd gl text-white hover:border-[var(--bv)] ${orientation.flipH ? 'text-[var(--cy)] border-[var(--cy)]' : ''}`}
+            onClick={onRotateScreen}
+            title="Rotate screen"
+            aria-label="Rotate screen"
+            className="rnd gl text-white hover:border-[var(--bv)]"
           >
-            <FlipHorizontal className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onFlipVertical}
-            aria-pressed={orientation.flipV}
-            title="Flip vertically"
-            aria-label="Flip vertically"
-            className={`rnd gl text-white hover:border-[var(--bv)] ${orientation.flipV ? 'text-[var(--cy)] border-[var(--cy)]' : ''}`}
-          >
-            <FlipVertical className="w-4 h-4" />
+            <Smartphone className="w-4 h-4" />
           </button>
 
-          {/* Orientation: rotate & flip popover (purely visual) */}
+          {/* Video rotation popover (purely visual) */}
           <div className="relative">
             <button
               onClick={() => setOrientationMenuOpen((v) => !v)}
-              title="Rotate & flip"
-              aria-label="Rotate and flip options"
+              title="Rotate video"
+              aria-label="Rotate video options"
               aria-expanded={orientationMenuOpen}
-              className={`rnd gl text-white hover:border-[var(--bv)] ${orientation.rotate !== 0 || orientation.flipH || orientation.flipV ? 'border-[var(--cy)]' : ''}`}
+              className={`rnd gl text-white hover:border-[var(--bv)] ${orientation.rotate !== 0 ? 'border-[var(--cy)]' : ''}`}
             >
               <RefreshCw className={`w-4 h-4 ${orientation.rotate !== 0 ? 'text-[var(--cy)]' : 'text-slate-400'}`} />
             </button>
@@ -407,7 +405,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                 onClick={(e) => e.stopPropagation()}
               >
                 <p className="px-2 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--t3)]">
-                  Rotate &amp; flip (visual only)
+                  Rotate video (visual only)
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button onClick={onRotateCounterClockwise} className="chip gl text-white text-[11px] h-9 px-2 justify-center" title="Rotate counter-clockwise 90°">
@@ -418,12 +416,6 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                   </button>
                   <button onClick={onRotate180} className="chip gl text-white text-[11px] h-9 px-2 justify-center" title="Rotate 180°">
                     <RotateCw className="w-3.5 h-3.5" /> 180°
-                  </button>
-                  <button onClick={onFlipHorizontal} className={`chip gl text-[11px] h-9 px-2 justify-center ${orientation.flipH ? 'text-[var(--cy)] border-[var(--cy)]' : 'text-white'}`} title="Flip horizontally">
-                    <FlipHorizontal className="w-3.5 h-3.5" /> Flip H
-                  </button>
-                  <button onClick={onFlipVertical} className={`chip gl text-[11px] h-9 px-2 justify-center ${orientation.flipV ? 'text-[var(--cy)] border-[var(--cy)]' : 'text-white'}`} title="Flip vertically">
-                    <FlipVertical className="w-3.5 h-3.5" /> Flip V
                   </button>
                   <button onClick={onResetOrientation} className="chip gl text-white text-[11px] h-9 px-2 justify-center" title="Reset orientation">
                     Reset
