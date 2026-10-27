@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useMedia } from '@/context/MediaSessionContext';
-import { CineFlowLogo } from '@/components/brand/Logo';
+import { CineFlowWordmark } from '@/components/brand/Wordmark';
 
 const NAV_LINKS = [
   { label: 'Player', href: '/player', icon: Film },
@@ -78,13 +78,13 @@ export const Navbar: React.FC = () => {
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="mx-auto flex h-12 max-w-7xl items-center justify-between gap-3 px-3 sm:h-14 sm:px-6 lg:px-8">
-          {/* Zone 1: Brand — logo mark + compact wordmark on the left */}
+          {/* Zone 1: Brand — text-only wordmark (final branding, no logo asset) */}
           <Link
             href="/"
             aria-label="CineFlow home"
-            className="flex shrink-0 items-center rounded-xl p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ev)]"
+            className="flex shrink-0 items-center rounded-xl px-1 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ev)]"
           >
-            <CineFlowLogo className="h-9 w-9 shadow-[0_0_0_1px_rgba(255,255,255,0.06)] sm:h-10 sm:w-10" />
+            <CineFlowWordmark className="text-[19px] leading-none sm:text-[22px]" />
           </Link>
 
           {/* Zone 2: Navigation Links (large screens only — keeps tablets on icon actions) */}

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { MediaProvider } from '@/context/MediaSessionContext';
 import { Navbar } from '@/components/app-shell/Navbar';
+import { SignatureFooter } from '@/components/app-shell/SignatureFooter';
 import { BottomPillNav } from '@/components/navigation/BottomPillNav';
 import { SplashScreen } from '@/components/brand/SplashScreen';
 import { ServiceWorkerRegistrar } from '@/components/app-shell/ServiceWorkerRegistrar';
@@ -56,6 +57,7 @@ export default function RootLayout({
           <SplashScreen />
           <Navbar />
           <main className="flex-1 flex flex-col">{children}</main>
+          <SignatureFooter />
           <BottomPillNav />
           <ServiceWorkerRegistrar />
         </MediaProvider>
