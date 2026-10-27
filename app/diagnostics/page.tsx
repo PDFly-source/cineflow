@@ -18,7 +18,7 @@ import {
 import { runPlaybackDiagnostics, augmentWithDecodingInfo, DiagnosticsReport } from '@/lib/media/diagnostics';
 import { probeMedia } from '@/lib/media/container-probe';
 import type { MediaProbe } from '@/lib/media/container-probe';
-import { decidePlaybackPlan, snapshotCapabilities } from '@/lib/media/compatibility';
+import { decidePlaybackPlan, snapshotCapabilities, statusLabelFor } from '@/lib/media/compatibility';
 import { getEngineInfo } from '@/lib/media/ffmpeg-client';
 import type { EngineInfo } from '@/lib/media/ffmpeg-client';
 import { FileVideo, FlaskConical } from 'lucide-react';
@@ -248,7 +248,7 @@ export default function DiagnosticsPage() {
                         : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                 }`}
               >
-                Plan: {filePlan.path === 'convert' ? 'native-first, convert offered' : filePlan.path}
+                Status: {statusLabelFor(filePlan)}
               </span>
             </div>
           )}
@@ -282,11 +282,19 @@ export default function DiagnosticsPage() {
                 </p>
               )}
               {engineInfo.decoders.length > 0 && (
-                <p className="text-slate-400">
-                  Dolby/DTS decoders: <span className={engineInfo.decoders.some((d) => ['ac3', 'eac3', 'dts', 'truehd'].includes(d)) ? 'text-emerald-400 font-mono' : 'text-rose-400 font-mono'}>
-                    {['ac3', 'eac3', 'dts', 'truehd'].map((d) => d + (engineInfo.decoders.includes(d) ? '✓' : '✗')).join(' ')}
-                  </span>
-                </p>
+                <>
+                  <p className="text-slate-400">
+                    Dolby/DTS audio decoders: <span className="text-emerald-400 font-mono">
+                      {['ac3', 'eac3', 'dca', 'truehd'].map((d) => d + (engineInfo.decoders.includes(d) ? '✓' : '✗')).join(' ')}
+                    </span>
+                    <span className="text-slate-500"> (dca = DTS)</span>
+                  </p>
+                  <p className="text-slate-400">
+                    Video decoders for local re-encoding: <span className="text-emerald-400 font-mono">
+                      {['h264', 'hevc', 'vp9', 'mpeg4'].map((d) => d + (engineInfo.decoders.includes(d) ? '✓' : '✗')).join(' ')}
+                    </span>
+                  </p>
+                </>
               )}
               <p className="text-slate-500">
                 Actual decoding still depends on this device; conversion feasibility is checked per file before it runs.

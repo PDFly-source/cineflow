@@ -204,6 +204,27 @@ export function decidePlaybackPlan(probe: MediaProbe, caps: CapabilitySnapshot):
   };
 }
 
+/**
+ * Canonical user-facing status for a decision:
+ * Native Playback | Audio Conversion Available | Container Remux Available |
+ * Video Conversion Required | Unsupported.
+ * A pure stream-copy remux is labelled separately from audio conversion —
+ * calling it an "audio conversion" would be inaccurate.
+ */
+export function statusLabelFor(decision: PlaybackDecision): string {
+  switch (decision.path) {
+    case 'native':
+    case 'attempt-native':
+      return 'Native Playback';
+    case 'convert':
+      if (decision.operation === 'audio-aac-transcode') return 'Audio Conversion Available';
+      if (decision.operation === 'remux-mp4') return 'Container Remux Available';
+      return 'Video Conversion Required';
+    default:
+      return 'Unsupported';
+  }
+}
+
 export function videoCodecName(codec: VideoCodecId | string): string {
   switch (codec) {
     case 'h264': return 'H.264 (AVC)';

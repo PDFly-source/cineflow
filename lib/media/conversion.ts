@@ -98,13 +98,14 @@ export function requiredDecoders(op: ConversionOp, probe: MediaProbe): string[] 
 }
 
 /** Maps our codec ids to the decoder name(s) the build must provide. */
-function decoderNamesFor(rawCodec: string): string[] {
+export function decoderNamesFor(rawCodec: string): string[] {
   const raw = rawCodec.toLowerCase();
   if (raw.includes('v_mpegh') || raw.includes('hevc') || raw === 'h265') return ['hevc'];
   if (raw.includes('v_mpeg4') || raw.includes('avc') || raw === 'h264') return ['h264'];
-  if (raw === 'ac3' || raw.includes('a_ac3')) return ['ac3'];
+  if (raw === 'ac3' || raw.includes('a_ac3')) return ['ac3', 'ac3_fixed'];
   if (raw === 'eac3' || raw.includes('a_eac3')) return ['eac3'];
-  if (raw.includes('a_dts')) return ['dts'];
+  // FFmpeg registers the DTS decoder under the name 'dca', not 'dts'.
+  if (raw.includes('a_dts') || raw === 'dts') return ['dca'];
   if (raw.includes('a_truehd')) return ['truehd'];
   if (raw.includes('a_aac')) return ['aac'];
   if (raw.includes('a_flac')) return ['flac'];

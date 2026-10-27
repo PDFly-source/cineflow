@@ -63,6 +63,34 @@ export function parseFfmpegTimeSeconds(line: string): number | null {
   return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
 }
 
+/**
+ * Parses raw -version / -encoders / -decoders log chunks into codec lists.
+ * Exported for regression tests. Chunks may coalesce several output lines
+ * into one event; lines are split before matching so codec lists parse
+ * identically regardless of chunking.
+ */
+export function parseEngineLists(captured: string[]): {
+  versionLine: string | null;
+  configLine: string | null;
+  encoders: string[];
+  decoders: string[];
+} {
+  const versionLine = captured.find((l) => l.startsWith('ffmpeg version')) ?? null;
+  const configLine = captured.find((l) => l.trim().startsWith('configuration:')) ?? null;
+  const listRe = /^\s+[A-Z.]{6}\s+([A-Za-z0-9_]+)\s/;
+  const lines = captured.flatMap((l) => l.split('\n')).filter((l) => l.trim().length > 0);
+  const decLineIdx = lines.findIndex((l) => l.includes('Decoders:'));
+  const encoders: string[] = [];
+  const decoders: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = listRe.exec(lines[i]);
+    if (!m) continue;
+    if (decLineIdx === -1 || i < decLineIdx) encoders.push(m[1]);
+    else decoders.push(m[1]);
+  }
+  return { versionLine, configLine, encoders, decoders };
+}
+
 async function introspect(ffmpeg: FFmpeg): Promise<Pick<EngineInfo, 'version' | 'configuration' | 'encoders' | 'decoders'>> {
   const captured: string[] = [];
   logListener = (line) => captured.push(line);
@@ -73,20 +101,7 @@ async function introspect(ffmpeg: FFmpeg): Promise<Pick<EngineInfo, 'version' | 
   } finally {
     logListener = null;
   }
-  const versionLine = captured.find((l) => l.startsWith('ffmpeg version')) ?? null;
-  const configLine = captured.find((l) => l.trim().startsWith('configuration:')) ?? null;
-  const listRe = /^\s+[A-Z.]{6}\s+([A-Za-z0-9_]+)\s/;
-  const encIdx = captured.findIndex((l) => l.includes('Encoders:'));
-  const decIdx = captured.findIndex((l) => l.includes('Decoders:'));
-  const encoders: string[] = [];
-  const decoders: string[] = [];
-  for (let i = encIdx + 1; i < captured.length; i++) {
-    const m = listRe.exec(captured[i]);
-    if (m) {
-      if (i < decIdx) encoders.push(m[1]);
-      else decoders.push(m[1]);
-    }
-  }
+  const { versionLine, configLine, encoders, decoders } = parseEngineLists(captured);
   return { version: versionLine, configuration: configLine, encoders, decoders };
 }
 
@@ -219,7 +234,17 @@ export async function runConversion(opts: RunOptions): Promise<RunResult> {
       await ffmpeg.mount('WORKERFS', { files: [opts.file] }, mountPoint);
       mounted = true;
     } catch (mountErr) {
-      // Fallback: write the input into MEMFS (small files only, callers gate size).
+      // Fallback: write the input into MEMFS. This buffers the whole file into
+      // wasm memory, so it is only safe for small files — refuse rather than
+      // OOM-crash the worker when WORKERFS mounting is unavailable.
+      const MEMFS_MAX_BYTES = 300 * 1024 * 1024;
+      if (opts.file.size > MEMFS_MAX_BYTES) {
+        throw new Error(
+          'This file is too large to convert on this device without streaming storage (' +
+            (opts.file.size / 1024 ** 2).toFixed(0) +
+            ' MB), and streaming could not be set up in this browser. The original file is unchanged.'
+        );
+      }
       try {
         const data = new Uint8Array(await opts.file.arrayBuffer());
         await ffmpeg.writeFile(mountPoint + '/' + opts.file.name, data);

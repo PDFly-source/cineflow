@@ -11,7 +11,7 @@ import React from 'react';
 import { AlertTriangle, Check, ChevronDown, FileVideo, Loader2, RefreshCw, X, Zap } from 'lucide-react';
 import type { MediaProbe } from '@/lib/media/container-probe';
 import type { PlaybackDecision } from '@/lib/media/compatibility';
-import { audioCodecName, videoCodecName } from '@/lib/media/compatibility';
+import { audioCodecName, statusLabelFor, videoCodecName } from '@/lib/media/compatibility';
 import type { ConversionResult, ConversionRefusal } from '@/lib/media/conversion';
 
 export interface CompatibilityDialogProps {
@@ -74,6 +74,13 @@ export function CompatibilityDialog(props: CompatibilityDialogProps) {
         </div>
 
         <div className="p-4 space-y-4">
+          {/* Canonical status */}
+          {phase !== 'converting' && (
+            <span className="inline-block text-[10px] font-mono font-bold px-2 py-0.5 rounded uppercase bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+              Status: {statusLabelFor(decision)}
+            </span>
+          )}
+
           {/* Detected media facts */}
           <div className="grid grid-cols-2 gap-2 text-[11px]">
             <div className="rounded-xl bg-slate-800/60 border border-slate-700/60 p-2.5">

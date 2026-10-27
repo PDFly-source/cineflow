@@ -316,3 +316,152 @@ test('cancellation throws AbortError through convertMedia contract', async () =>
   const { cancelMediaConversion } = await import('../lib/media/conversion');
   assert.doesNotThrow(() => cancelMediaConversion());
 });
+
+/* ---------------------------------------------------------------- */
+/* Phase 2.8: decoder-name truth, status labels, introspection       */
+/* ---------------------------------------------------------------- */
+
+test('decoderNamesFor maps DTS to the real FFmpeg decoder name dca', async () => {
+  const { decoderNamesFor } = await import('../lib/media/conversion');
+  assert.deepEqual(decoderNamesFor('A_DTS'), ['dca']);          // FFmpeg registers DTS as 'dca'
+  assert.deepEqual(decoderNamesFor('A_TRUEHD'), ['truehd']);
+  assert.deepEqual(decoderNamesFor('A_AC3'), ['ac3', 'ac3_fixed']);
+  assert.deepEqual(decoderNamesFor('A_EAC3'), ['eac3']);
+  assert.deepEqual(decoderNamesFor('V_MPEGH/ISO/HEVC'), ['hevc']);
+  assert.deepEqual(decoderNamesFor('V_MPEG4/ISO/AVC'), ['h264']);
+});
+
+test('statusLabelFor returns the four canonical statuses', async () => {
+  const { statusLabelFor } = await import('../lib/media/compatibility');
+  const mk = (path: 'native' | 'attempt-native' | 'convert' | 'unsupported', operation?: 'remux-mp4' | 'audio-aac-transcode' | 'full-transcode-h264') =>
+    statusLabelFor({ path, reason: 'r', explanation: '', detail: [], operation } as never);
+
+  assert.equal(mk('native'), 'Native Playback');
+  assert.equal(mk('attempt-native'), 'Native Playback');
+  assert.equal(mk('convert', 'audio-aac-transcode'), 'Audio Conversion Available');
+  assert.equal(mk('convert', 'remux-mp4'), 'Container Remux Available');
+  assert.equal(mk('convert', 'full-transcode-h264'), 'Video Conversion Required');
+  assert.equal(mk('unsupported'), 'Unsupported');
+});
+
+test('DTS audio in MKV is offered audio conversion (dca decoder exists in the build)', async () => {
+  const probe: MediaProbe = {
+    fileName: 'dts.mkv', container: 'matroska', sizeBytes: 40_000_000, durationSeconds: 600,
+    videoTracks: [{ type: 'video', codec: 'h264', codecRaw: 'V_MPEG4/ISO/AVC' }],
+    audioTracks: [{ type: 'audio', codec: 'dts', codecRaw: 'A_DTS' }],
+    notes: [], containerConfident: true, subtitleTracks: [],
+  };
+  const caps: CapabilitySnapshot = {
+    container: 'no',
+    video: { h264: 'probably' },
+    audio: { dts: 'no' },
+  };
+  const plan = decidePlaybackPlan(probe, caps);
+  assert.equal(plan.path, 'convert');
+  assert.equal(plan.operation, 'audio-aac-transcode');
+  assert.equal(await statusLabelForSafe(plan), 'Audio Conversion Available');
+});
+
+test('TrueHD audio in MKV is offered audio conversion (truehd decoder exists in the build)', async () => {
+  const probe: MediaProbe = {
+    fileName: 'thd.mkv', container: 'matroska', sizeBytes: 40_000_000, durationSeconds: 600,
+    videoTracks: [{ type: 'video', codec: 'h264', codecRaw: 'V_MPEG4/ISO/AVC' }],
+    audioTracks: [{ type: 'audio', codec: 'truehd', codecRaw: 'A_TRUEHD' }],
+    notes: [], containerConfident: true, subtitleTracks: [],
+  };
+  const caps: CapabilitySnapshot = {
+    container: 'no',
+    video: { h264: 'probably' },
+    audio: { truehd: 'no' },
+  };
+  const plan = decidePlaybackPlan(probe, caps);
+  assert.equal(plan.path, 'convert');
+  assert.equal(plan.operation, 'audio-aac-transcode');
+});
+
+test('E-AC-3 and AC-3 are detected as separate audio codecs with separate statuses', async () => {
+  const mkProbe = (raw: string, codec: 'ac3' | 'eac3'): MediaProbe => ({
+    fileName: raw + '.mkv', container: 'matroska', sizeBytes: 40_000_000, durationSeconds: 600,
+    videoTracks: [{ type: 'video', codec: 'h264', codecRaw: 'V_MPEG4/ISO/AVC' }],
+    audioTracks: [{ type: 'audio', codec, codecRaw: raw }],
+    notes: [], containerConfident: true, subtitleTracks: [],
+  });
+  // Browser that plays AC-3 but NOT E-AC-3 (common Safari profile): the E-AC-3
+  // file must be flagged for audio conversion while the AC-3 file stays native
+  // once remuxed... container is Matroska so both convert, but the operation
+  // must be audio transcode with the differing codec named in the explanation.
+  const caps: CapabilitySnapshot = {
+    container: 'no',
+    video: { h264: 'probably' },
+    audio: { ac3: 'probably', eac3: 'no' },
+  };
+  const ac3Plan = decidePlaybackPlan(mkProbe('A_AC3', 'ac3'), caps);
+  const eac3Plan = decidePlaybackPlan(mkProbe('A_EAC3', 'eac3'), caps);
+  assert.equal(eac3Plan.operation, 'audio-aac-transcode');
+  assert.match(eac3Plan.explanation, /Dolby Digital Plus/);
+  // AC-3 is natively decodable, but the Matroska container still needs a remux.
+  assert.equal(ac3Plan.operation, 'remux-mp4');
+  assert.match(ac3Plan.explanation, /copied 1:1/);
+});
+
+test('introspection parser is robust to multi-line log chunks', async () => {
+  // The engine's log events can coalesce several stdout lines into one chunk.
+  // Reproduce a coalesced -encoders/-decoders stream and verify parsing.
+  const { parseEngineLists } = await import('../lib/media/ffmpeg-client');
+  const chunked = [
+    'ffmpeg version 5.1.4 Copyright (c) 2000-2023',
+    'Encoders:\n V..... aac  AAC (Advanced Audio Coding)',
+    ' V..... libx264  libx264 H.264',
+    'Decoders:\n A....D ac3  AC-3\n A....D eac3  E-AC-3',
+    ' A....D dca  DTS\n A....D truehd  TrueHD',
+  ];
+  const lists = parseEngineLists(chunked);
+  assert.ok(lists.encoders.includes('aac'));
+  assert.ok(lists.encoders.includes('libx264'));
+  assert.ok(!lists.encoders.includes('ac3'));
+  assert.ok(lists.decoders.includes('ac3'));
+  assert.ok(lists.decoders.includes('eac3'));
+  assert.ok(lists.decoders.includes('dca'));
+  assert.ok(lists.decoders.includes('truehd'));
+  assert.ok(!lists.decoders.includes('aac'));
+});
+
+test('2 GB and 10 GB files are refused conversion honestly, native playback preferred', () => {
+  const probe: MediaProbe = {
+    fileName: 'big.mkv', container: 'matroska', sizeBytes: 2 * 1024 ** 3, durationSeconds: 7200,
+    videoTracks: [{ type: 'video', codec: 'h264', codecRaw: 'V_MPEG4/ISO/AVC' }],
+    audioTracks: [{ type: 'audio', codec: 'ac3', codecRaw: 'A_AC3' }],
+    notes: [], containerConfident: true, subtitleTracks: [],
+  };
+  const tenGB = { ...probe, sizeBytes: 10 * 1024 ** 3 };
+  for (const op of ['remux-mp4', 'audio-aac-transcode', 'full-transcode-h264'] as const) {
+    const f2 = assessFeasibility(op, probe.sizeBytes, probe.durationSeconds);
+    const f10 = assessFeasibility(op, tenGB.sizeBytes, tenGB.durationSeconds);
+    assert.equal(f2.ok, false, op + ' at 2 GB must be refused');
+    assert.equal(f10.ok, false, op + ' at 10 GB must be refused');
+    assert.ok(f2.explanation.length > 0);
+  }
+});
+
+test('HEVC on a non-HEVC browser is Video Conversion Required, never reported playable', async () => {
+  const probe: MediaProbe = {
+    fileName: 'hevc.mkv', container: 'matroska', sizeBytes: 30_000_000, durationSeconds: 120,
+    videoTracks: [{ type: 'video', codec: 'h265', codecRaw: 'V_MPEGH/ISO/HEVC' }],
+    audioTracks: [{ type: 'audio', codec: 'aac', codecRaw: 'A_AAC' }],
+    notes: [], containerConfident: true, subtitleTracks: [],
+  };
+  const caps: CapabilitySnapshot = {
+    container: 'no',
+    video: { h265: 'no' },
+    audio: { aac: 'probably' },
+  };
+  const plan = decidePlaybackPlan(probe, caps);
+  assert.equal(plan.operation, 'full-transcode-h264');
+  assert.equal(await statusLabelForSafe(plan), 'Video Conversion Required');
+  assert.match(plan.explanation, /cannot decode/);
+});
+
+async function statusLabelForSafe(plan: ReturnType<typeof decidePlaybackPlan>): Promise<string> {
+  const { statusLabelFor } = await import('../lib/media/compatibility');
+  return statusLabelFor(plan);
+}
