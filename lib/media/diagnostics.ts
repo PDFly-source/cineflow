@@ -13,6 +13,13 @@ export interface CodecTestResult {
   status: 'supported' | 'partial' | 'unsupported';
   description: string;
   solution?: string;
+  /**
+   * Phase 2.7: the local on-device fix our conversion engine can apply for
+   * this codec/container (honest — null when no safe fix exists).
+   */
+  localFallback?: 'remux' | 'audio-transcode' | 'full-transcode' | null;
+  /** Async mediaCapabilities result (null = API unavailable or not yet probed). */
+  decoding?: { supported: boolean; smooth: boolean; powerEfficient: boolean } | null;
 }
 
 export interface SystemCapability {
@@ -128,6 +135,48 @@ const TEST_FORMATS: Array<{
   },
 ];
 
+/** Which entries the Phase 2.7 local engine can fix (stream copy where possible). */
+const LOCAL_FALLBACK: Record<string, 'remux' | 'audio-transcode' | 'full-transcode'> = {
+  'audio-ac3': 'audio-transcode',
+  'audio-eac3': 'audio-transcode',
+  'container-mkv': 'remux',
+  'mp4-hevc': 'full-transcode',
+};
+
+/**
+ * Augments a report with navigator.mediaCapabilities.decodingInfo() results.
+ * A positive canPlayType string is only an ESTIMATE; decodingInfo adds
+ * smooth/powerEfficient evidence where the browser provides it.
+ */
+export async function augmentWithDecodingInfo(report: DiagnosticsReport): Promise<DiagnosticsReport> {
+  const mc = (navigator as Navigator & { mediaCapabilities?: MediaCapabilities }).mediaCapabilities;
+  if (!mc) return report;
+  const nextResults: CodecTestResult[] = [];
+  for (const r of report.results) {
+    if (r.status === 'unsupported') {
+      nextResults.push({ ...r, decoding: null });
+      continue;
+    }
+    try {
+      const isAudio = r.mimeType.startsWith('audio/');
+      const cfg: MediaDecodingConfiguration = isAudio
+        ? { type: 'file', audio: { contentType: r.mimeType, bitrate: 192000 } }
+        : {
+            type: 'file',
+            video: { contentType: r.mimeType, width: 1920, height: 1080, bitrate: 8_000_000, framerate: 30 },
+          };
+      const res = await mc.decodingInfo(cfg);
+      nextResults.push({
+        ...r,
+        decoding: { supported: res.supported, smooth: !!res.smooth, powerEfficient: !!res.powerEfficient },
+      });
+    } catch {
+      nextResults.push({ ...r, decoding: null });
+    }
+  }
+  return { ...report, results: nextResults };
+}
+
 export function runPlaybackDiagnostics(): DiagnosticsReport {
   if (typeof window === 'undefined') {
     return {
@@ -177,6 +226,7 @@ export function runPlaybackDiagnostics(): DiagnosticsReport {
       canPlayResult: canPlay as 'probably' | 'maybe' | '',
       mseSupported,
       status,
+      localFallback: LOCAL_FALLBACK[f.id] ?? null,
       description: f.description,
       solution: f.solution,
     };

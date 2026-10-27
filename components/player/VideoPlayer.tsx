@@ -30,7 +30,14 @@ import {
 import { fitBiasScale, modeBaseBox } from '@/lib/player/display-modes';
 import { type VideoZoomApi } from '@/components/player/gestures/VideoGestureSurface';
 import { useMediaSession } from '@/hooks/use-media-session';
-import { Loader2, AlertCircle, FolderOpen, Film, Play, Sparkles, Activity } from 'lucide-react';
+import { probeMedia } from '@/lib/media/container-probe';
+import type { MediaProbe } from '@/lib/media/container-probe';
+import { decidePlaybackPlan, snapshotCapabilities, assessFeasibility } from '@/lib/media/compatibility';
+import type { PlaybackDecision } from '@/lib/media/compatibility';
+import { convertMedia, cancelMediaConversion, isRefusal } from '@/lib/media/conversion';
+import type { ConversionResult, ConversionRefusal } from '@/lib/media/conversion';
+import { CompatibilityDialog } from './CompatibilityDialog';
+import { Loader2, AlertCircle, FolderOpen, Film, Play, Sparkles, Activity, RefreshCw } from 'lucide-react';
 import { VideoFitMode } from '@/lib/storage/db';
 import { generateTestClipFile } from '@/lib/media/testClipGenerator';
 
@@ -84,6 +91,24 @@ export const VideoPlayer: React.FC = () => {
   const [isBuffering, setIsBuffering] = useState<boolean>(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [isGeneratingTest, setIsGeneratingTest] = useState<boolean>(false);
+
+  // Phase 2.7 compatibility pipeline state
+  type CompatPhase = 'probing' | 'silent' | 'offer' | 'converting' | 'ready' | 'failed';
+  interface CompatState {
+    mediaKey: string;
+    phase: CompatPhase;
+    probe: MediaProbe;
+    decision: PlaybackDecision;
+    progress: number | null;
+    result?: ConversionResult;
+    refusal?: ConversionRefusal;
+    error?: string;
+  }
+  const [compat, setCompat] = useState<CompatState | null>(null);
+  const compatCancelRef = useRef(false);
+  // Converted copy for the CURRENT original (object URL we own and must revoke).
+  const [convertedPlay, setConvertedPlay] = useState<{ mediaKey: string; objectUrl: string; name: string } | null>(null);
+  const activeObjectUrl = convertedPlay && convertedPlay.mediaKey === currentItem?.id ? convertedPlay.objectUrl : currentItem?.objectUrl;
 
   // In-player brightness (40% to 160%)
   const [brightness, setBrightness] = useState<number>(100);
@@ -147,10 +172,76 @@ export const VideoPlayer: React.FC = () => {
   // Fallback file input
   const filePickerRef = useRef<HTMLInputElement>(null);
 
-  // Auto-play / load media stream whenever currentItem changes
+  // Phase 2.7: probe compatibility whenever the current file changes.
+  // Native playback is never blocked: probing runs in the background and only
+  // opens a dialog when the decision engine says conversion is needed.
+  useEffect(() => {
+    if (!currentItem?.file) return;
+    const mediaKey = currentItem.id;
+    let cancelled = false;
+    (async () => {
+      try {
+        const probe = await probeMedia(currentItem.file);
+        if (cancelled) return;
+        const caps = snapshotCapabilities(probe);
+        const decision = decidePlaybackPlan(probe, caps);
+        if (cancelled) return;
+        if (decision.path === 'native') {
+          setCompat(null);
+          return;
+        }
+        const refusal =
+          decision.path === 'convert' && decision.operation
+            ? assessFeasibility(decision.operation, probe.sizeBytes, probe.durationSeconds)
+            : null;
+        const refuseObj: ConversionRefusal | undefined =
+          refusal && !refusal.ok
+            ? { refused: true, reason: refusal.refusal ?? 'too-large', explanation: refusal.explanation }
+            : undefined;
+        setCompat({
+          mediaKey,
+          phase: decision.path === 'convert' || decision.path === 'unsupported' ? 'offer' : 'silent',
+          probe,
+          decision,
+          progress: null,
+          refusal: refuseObj,
+        });
+      } catch {
+        // Probing itself failed — stay silent; native attempt + error handler covers it.
+        if (!cancelled) setCompat(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentItem?.id, currentItem?.file]);
+
+  // Revoke a converted copy's object URL when it is replaced or dropped.
+  useEffect(() => {
+    const held = convertedPlay;
+    return () => {
+      if (held) {
+        try {
+          URL.revokeObjectURL(held.objectUrl);
+        } catch {}
+      }
+    };
+  }, [convertedPlay]);
+
+  // Drop the converted copy when a different file becomes current.
+  useEffect(() => {
+    if (convertedPlay && convertedPlay.mediaKey !== currentItem?.id) {
+      try {
+        URL.revokeObjectURL(convertedPlay.objectUrl);
+      } catch {}
+      setConvertedPlay(null);
+    }
+  }, [currentItem?.id, convertedPlay]);
+
+  // Auto-play / load media stream whenever the active source changes
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !currentItem) return;
+    if (!video || !currentItem || !activeObjectUrl) return;
 
     setPlaybackError(null);
     setIsBuffering(false);
@@ -171,7 +262,7 @@ export const VideoPlayer: React.FC = () => {
           setIsPlaying(false);
         });
     }
-  }, [currentItem]);
+  }, [currentItem, activeObjectUrl]);
 
   // Track container size so rotated video bounds can be computed without clipping.
   useEffect(() => {
@@ -508,6 +599,125 @@ export const VideoPlayer: React.FC = () => {
     setPlaybackError(errorMsg);
     setIsBuffering(false);
     setIsPlaying(false);
+
+    // Phase 2.7: on real decode failures, surface the compatibility pipeline.
+    if (mediaErr.code === 3 || mediaErr.code === 4) {
+      if (compat && compat.phase === 'silent') {
+        // Probed earlier; open the offer now that native playback actually failed.
+        setCompat({ ...compat, phase: 'offer' });
+      } else if (!compat && currentItem?.file) {
+        // Error came before/without a probe result — probe now.
+        (async () => {
+          try {
+            const probe = await probeMedia(currentItem.file);
+            const caps = snapshotCapabilities(probe);
+            const decision = decidePlaybackPlan(probe, caps);
+            const refusal =
+              decision.path === 'convert' && decision.operation
+                ? assessFeasibility(decision.operation, probe.sizeBytes, probe.durationSeconds)
+                : null;
+            setCompat({
+              mediaKey: currentItem.id,
+              phase: decision.path === 'convert' || decision.path === 'unsupported' ? 'offer' : 'silent',
+              probe,
+              decision,
+              progress: null,
+              refusal:
+                refusal && !refusal.ok
+                  ? { refused: true, reason: refusal.refusal ?? 'too-large', explanation: refusal.explanation }
+                  : undefined,
+            });
+          } catch {
+            // keep the plain error banner
+          }
+        })();
+      }
+    }
+  };
+
+  // --- Phase 2.7 conversion actions ---
+  const handleStartConversion = () => {
+    if (!compat || !compat.decision.operation || !currentItem?.file) return;
+    compatCancelRef.current = false;
+    setCompat({ ...compat, phase: 'converting', progress: null, error: undefined, refusal: undefined });
+    (async () => {
+      try {
+        const outcome = await convertMedia({
+          file: currentItem.file,
+          probe: compat.probe,
+          operation: compat.decision.operation!,
+          onProgress: (pct) => setCompat((c) => (c && c.phase === 'converting' ? { ...c, progress: pct } : c)),
+          isCancelled: () => compatCancelRef.current,
+        });
+        setCompat((c) => {
+          if (!c) return c;
+          if (isRefusal(outcome)) {
+            return { ...c, phase: 'offer', refusal: outcome, progress: null };
+          }
+          return { ...c, phase: 'ready', result: outcome, progress: 100 };
+        });
+      } catch (err) {
+        const name = err instanceof DOMException ? err.name : '';
+        if (name === 'AbortError' || compatCancelRef.current) {
+          setCompat((c) => (c ? { ...c, phase: 'offer', progress: null } : c));
+          return;
+        }
+        setCompat((c) =>
+          c
+            ? {
+                ...c,
+                phase: 'failed',
+                progress: null,
+                error:
+                  err instanceof Error
+                    ? err.message
+                    : 'Conversion failed on this device. The original file is unchanged.',
+              }
+            : c
+        );
+      }
+    })();
+  };
+
+  const handleCancelConversion = () => {
+    compatCancelRef.current = true;
+    cancelMediaConversion();
+    setCompat((c) => (c ? { ...c, phase: 'offer', progress: null } : c));
+  };
+
+  const handlePlayConverted = () => {
+    if (!compat?.result || !currentItem) return;
+    setConvertedPlay((prev) => {
+      if (prev) {
+        try {
+          URL.revokeObjectURL(prev.objectUrl);
+        } catch {}
+      }
+      return { mediaKey: currentItem.id, objectUrl: compat.result!.objectUrl, name: compat.result!.outputProbe.fileName ?? 'converted.mp4' };
+    });
+    setCompat(null);
+    setPlaybackError(null);
+  };
+
+  const handleTryOriginal = () => {
+    // Drop any converted copy and reload the original object URL.
+    if (convertedPlay) {
+      try {
+        URL.revokeObjectURL(convertedPlay.objectUrl);
+      } catch {}
+      setConvertedPlay(null);
+    }
+    setCompat(null);
+    setPlaybackError(null);
+    const video = videoRef.current;
+    if (video) {
+      video.load();
+      video.play().catch(() => {});
+    }
+  };
+
+  const handleDismissCompat = () => {
+    setCompat(null);
   };
 
   const handleEnded = () => {
@@ -681,9 +891,9 @@ export const VideoPlayer: React.FC = () => {
     >
       {/* HTML5 Native Video Engine with key for clean remount */}
       <video
-        key={currentItem.objectUrl}
+        key={activeObjectUrl}
         ref={videoRef}
-        src={currentItem.objectUrl}
+        src={activeObjectUrl}
         preload="auto"
         playsInline
         className={`${fit.className} transition-[filter,transform] duration-150`}
@@ -748,6 +958,46 @@ export const VideoPlayer: React.FC = () => {
             <span className="text-xs font-medium tracking-wide">Buffering...</span>
           </div>
         </div>
+      )}
+
+      {/* Phase 2.7 compatibility dialog (proactive + error-driven) */}
+      {compat && compat.phase !== 'silent' && compat.phase !== 'probing' && !playbackError && (
+        <CompatibilityDialog
+          probe={compat.probe}
+          decision={compat.decision}
+          phase={compat.phase}
+          progress={compat.progress}
+          error={compat.error}
+          refusal={compat.refusal}
+          result={compat.result}
+          estimatedSeconds={
+            compat.decision.operation
+              ? assessFeasibility(compat.decision.operation, compat.probe.sizeBytes, compat.probe.durationSeconds).timeHint ||
+                assessFeasibility(compat.decision.operation, compat.probe.sizeBytes, compat.probe.durationSeconds).explanation
+              : undefined
+          }
+          onConvert={handleStartConversion}
+          onCancelConvert={handleCancelConversion}
+          onPlayConverted={handlePlayConverted}
+          onTryOriginal={handleTryOriginal}
+          onChooseOther={() => {
+            handleDismissCompat();
+            filePickerRef.current?.click();
+          }}
+          onDismiss={handleDismissCompat}
+        />
+      )}
+
+      {/* Converted-copy chip: honest badge with one tap back to the original */}
+      {convertedPlay?.mediaKey === currentItem?.id && !playbackError && (
+        <button
+          onClick={handleTryOriginal}
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-700/50 backdrop-blur text-[10px] font-medium text-cyan-300 flex items-center gap-1.5 hover:bg-cyan-900/80 transition"
+          aria-label="Using converted copy. Tap to return to the original file."
+        >
+          <RefreshCw className="w-3 h-3" aria-hidden />
+          Converted copy — tap for original
+        </button>
       )}
 
       {/* Playback Error Banner with Diagnostics Quick Access */}

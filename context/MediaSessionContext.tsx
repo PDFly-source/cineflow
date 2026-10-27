@@ -245,7 +245,16 @@ export const MediaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     const newItems = files.map(createItem);
-    setQueue(newItems);
+    // Release the previous queue's object URLs so replacing a playlist of
+    // multi-GB files never keeps stale Blob references alive.
+    setQueue((prev) => {
+      prev.forEach((item) => {
+        try {
+          if (item.objectUrl) URL.revokeObjectURL(item.objectUrl);
+        } catch {}
+      });
+      return newItems;
+    });
     const validStart = Math.min(Math.max(0, startIndex), newItems.length - 1);
     setCurrentIndex(validStart);
   }, [createItem]);
