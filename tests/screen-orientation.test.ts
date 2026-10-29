@@ -11,6 +11,8 @@ import {
   requestScreenRotation,
   releaseScreenOrientation,
   getNativeOrientationBridge,
+  isLandscapeViewport,
+  type ScreenOrientationLike,
 } from '../lib/player/screen-orientation.ts';
 
 const noWait = async () => {};
@@ -161,4 +163,52 @@ describe('getNativeOrientationBridge', () => {
     assert.ok(getNativeOrientationBridge());
     delete (globalThis as { window?: unknown }).window;
   });
+});
+
+
+// --- v0.2.1: rotation target must not depend on a stale web orientation ----
+
+test('landscapeHint decides the toggle direction even when screen.orientation is stale', async () => {
+  // The Android WebView can report the OLD screen.orientation.type for a frame
+  // or more after a native setRequestedOrientation(). Deriving the target from
+  // it made the second tap request the same orientation again (no visible
+  // change, which read as "the rotation button does nothing").
+  const calls: string[] = [];
+  const stale: ScreenOrientationLike = { type: 'landscape-primary' };
+
+  const result = await requestScreenRotation(
+    async () => {},
+    stale,
+    {
+      native: { lockOrientation: (o) => { calls.push(o); return true; } },
+      landscapeHint: true, // the layout already IS landscape
+      screenOrientation: stale,
+    }
+  );
+
+  assert.equal(result, 'locked');
+  assert.deepEqual(calls, ['portrait'], 'must ask the device for portrait, not landscape again');
+});
+
+test('landscapeHint false requests landscape from a portrait layout', async () => {
+  const calls: string[] = [];
+  const result = await requestScreenRotation(async () => {}, { type: 'portrait-primary' }, {
+    native: { lockOrientation: (o) => { calls.push(o); return true; } },
+    landscapeHint: false,
+  });
+  assert.equal(result, 'locked');
+  assert.deepEqual(calls, ['landscape']);
+});
+
+test('isLandscapeViewport trusts matchMedia over screen.orientation', () => {
+  const landscapeMql = (q: string) => ({ matches: q.includes('landscape') });
+  const portraitMql = (q: string) => ({ matches: q.includes('portrait') });
+  assert.equal(isLandscapeViewport(landscapeMql), true);
+  assert.equal(isLandscapeViewport(portraitMql), false);
+});
+
+test('releaseScreenOrientation asks the native bridge for auto so the app is never left sideways', () => {
+  const calls: string[] = [];
+  releaseScreenOrientation(null, { lockOrientation: (o) => { calls.push(o); return true; } });
+  assert.deepEqual(calls, ['auto']);
 });

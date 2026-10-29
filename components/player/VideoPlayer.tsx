@@ -23,6 +23,7 @@ import {
 } from '@/lib/player/orientation';
 import {
   getScreenOrientation,
+  isLandscapeViewport,
   releaseScreenOrientation,
   requestScreenRotation,
   ROTATE_SCREEN_FALLBACK_MESSAGE,
@@ -424,17 +425,25 @@ export const VideoPlayer: React.FC = () => {
   // or missing support we show the truthful fallback message instead of
   // pretending the screen rotated.
   const rotationInFlightRef = useRef(false);
+  // True while this page owns a real orientation lock (native or web). The
+  // AppMintly APK applies the activity orientation natively and never fires
+  // fullscreenchange, so a route change had nothing to release it: the whole
+  // app stayed sideways after leaving the player.
+  const orientationLockedRef = useRef(false);
   const rotateScreen = useCallback(async () => {
     // Single-flight: repeated taps while a rotation is in progress must never
     // stack fullscreen/lock requests (that is what caused orientation loops).
     if (rotationInFlightRef.current) return;
     rotationInFlightRef.current = true;
     try {
-      const result = await requestScreenRotation(enterPlayerFullscreen, getScreenOrientation());
+      const result = await requestScreenRotation(enterPlayerFullscreen, getScreenOrientation(), {
+        landscapeHint: isLandscapeViewport(),
+      });
       if (result === 'fallback') {
         showRotateScreenNotice(ROTATE_SCREEN_FALLBACK_MESSAGE);
       } else {
         // Real rotation happened: clear any stale fallback notice.
+        orientationLockedRef.current = true;
         setRotateScreenNotice(null);
       }
     } finally {
@@ -458,6 +467,29 @@ export const VideoPlayer: React.FC = () => {
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // The player owns the orientation lock for as long as it is mounted. Leaving
+  // the route (back to library/home, app backgrounded) must hand the device
+  // back to normal orientation, otherwise the library stays stuck in
+  // landscape. This is the path the APK actually takes: no fullscreenchange
+  // ever fires for a native rotation.
+  useEffect(() => {
+    const release = () => {
+      if (!orientationLockedRef.current) return;
+      orientationLockedRef.current = false;
+      releaseScreenOrientation(getScreenOrientation());
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') release();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', release);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', release);
+      release();
     };
   }, []);
 

@@ -47,6 +47,33 @@ export function getNativeOrientationBridge(): NativeOrientationBridge | null {
   return bridge;
 }
 
+/**
+ * True when the viewport is already landscape (device rotated, native
+ * activity rotation applied, or a wide browser window).
+ *
+ * Why this exists: the rotation toggle used to derive its target purely from
+ * `screen.orientation.type`. Inside the Android WebView that value can lag a
+ * native `setRequestedOrientation()` by a frame or more, so a second tap
+ * computed the SAME target and appeared to do nothing. The player now passes
+ * the layout truth it can already see, and the hint wins when present.
+ */
+export function isLandscapeViewport(
+  matchMediaImpl?: (query: string) => { matches: boolean }
+): boolean {
+  const mm =
+    matchMediaImpl ??
+    (typeof window !== 'undefined' ? window.matchMedia?.bind(window) : undefined);
+  if (mm) {
+    try {
+      if (mm('(orientation: landscape)').matches) return true;
+      if (mm('(orientation: portrait)').matches) return false;
+    } catch {
+      // fall through to the screen.orientation read
+    }
+  }
+  return isLandscapeType(getScreenOrientation()?.type ?? 'portrait-primary');
+}
+
 export function supportsOrientationLock(so: ScreenOrientationLike | null): boolean {
   return !!so && typeof so.lock === 'function';
 }
@@ -70,6 +97,12 @@ export interface RequestRotationOptions {
   screenOrientation?: ScreenOrientationLike | null;
   /** How long to wait for the fullscreen transition to settle (ms). */
   settleMs?: number;
+  /**
+   * Layout truth from the caller (see `isLandscapeViewport`). When provided it
+   * decides the toggle direction instead of `screen.orientation.type`, which
+   * can be stale for a frame after a native rotation.
+   */
+  landscapeHint?: boolean;
   /** Injectable delay (tests). */
   wait?: (ms: number) => Promise<void>;
 }
@@ -91,7 +124,12 @@ export async function requestScreenRotation(
   const { settleMs = 450, wait = defaultWait } = options;
   const screenOrientation = options.screenOrientation !== undefined ? options.screenOrientation : so;
   const currentType = screenOrientation?.type ?? 'portrait-primary';
-  const target = nextOrientationTarget(currentType);
+  const target: OrientationTarget =
+    options.landscapeHint !== undefined
+      ? options.landscapeHint
+        ? 'portrait'
+        : 'landscape'
+      : nextOrientationTarget(currentType);
 
   // Route 1 — native APK bridge (works where the WebView has no lock()).
   const native = options.native !== undefined ? options.native : getNativeOrientationBridge();
