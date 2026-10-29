@@ -40,6 +40,8 @@ import { CompatibilityDialog } from './CompatibilityDialog';
 import { Loader2, AlertCircle, FolderOpen, Film, Play, Sparkles, Activity, RefreshCw } from 'lucide-react';
 import { VideoFitMode } from '@/lib/storage/db';
 import { generateTestClipFile } from '@/lib/media/testClipGenerator';
+import { createAudioEnhancer, type AudioEnhancer } from '@/lib/audio/enhancer';
+import type { AudioPresetId, BandGains } from '@/lib/audio/presets';
 
 export const VideoPlayer: React.FC = () => {
   const {
@@ -139,7 +141,6 @@ export const VideoPlayer: React.FC = () => {
 
   // Controls visibility & auto-hide
   const [controlsVisible, setControlsVisible] = useState<boolean>(true);
-  const isControlsEffectivelyVisible = controlsVisible || !isPlaying;
   const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Modals state
@@ -147,6 +148,11 @@ export const VideoPlayer: React.FC = () => {
   const [showPlaylistDrawer, setShowPlaylistDrawer] = useState<boolean>(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState<boolean>(false);
+
+  // Fix 3: while Subtitle Studio is open the player navigation must stay
+  // visible and usable — the studio is a docked panel, not a takeover, so
+  // auto-hide is suspended instead of hidden behind a full-screen veil.
+  const isControlsEffectivelyVisible = controlsVisible || !isPlaying || showSubtitlesModal;
 
   // Pause playback when sleep timer expires
   useEffect(() => {
@@ -309,7 +315,7 @@ export const VideoPlayer: React.FC = () => {
 
   // When playback state changes, handle auto-hide timer without calling setState
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && !showSubtitlesModal) {
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       autoHideTimerRef.current = setTimeout(() => {
         setControlsVisible(false);
@@ -320,7 +326,78 @@ export const VideoPlayer: React.FC = () => {
     return () => {
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
     };
-  }, [isPlaying, settings.autoHideDelay]);
+  }, [isPlaying, settings.autoHideDelay, showSubtitlesModal]);
+
+  // --- Fix 4: local audio clarity chain (Web Audio, no network) ---
+  const audioEnhancerRef = useRef<AudioEnhancer | null>(null);
+  const [audioNotice, setAudioNotice] = useState<string | null>(null);
+  const audioGestureAllowedRef = useRef(false);
+
+  const ensureAudioEnhancer = useCallback((): AudioEnhancer | null => {
+    const el = videoRef.current;
+    if (!el) return null;
+    if (!audioEnhancerRef.current) {
+      audioEnhancerRef.current = createAudioEnhancer(el);
+    }
+    return audioEnhancerRef.current;
+  }, []);
+
+  // Applied only from real user gestures (preset taps, play, band drags) so
+  // an AudioContext can never block playback from starting.
+  const applyAudioPreset = useCallback(
+    async (id: AudioPresetId, bands?: BandGains) => {
+      audioGestureAllowedRef.current = true;
+      const enhancer = ensureAudioEnhancer();
+      if (!enhancer) return;
+      const ok = await enhancer.applyPreset(id, bands ?? settings.audioBands);
+      if (!ok && id !== 'off') {
+        setAudioNotice('Audio enhancement is not available in this browser. Playback continues with original audio.');
+      } else {
+        setAudioNotice(null);
+      }
+    },
+    [ensureAudioEnhancer, settings.audioBands]
+  );
+
+  const handleAudioPresetChange = useCallback(
+    (id: AudioPresetId) => {
+      updateSettings({ audioPreset: id });
+      void applyAudioPreset(id);
+    },
+    [applyAudioPreset, updateSettings]
+  );
+
+  const handleAudioBandChange = useCallback(
+    (band: keyof BandGains, db: number) => {
+      const next = { ...settings.audioBands, [band]: db };
+      updateSettings({ audioPreset: 'custom', audioBands: next });
+      void applyAudioPreset('custom', next);
+    },
+    [applyAudioPreset, settings.audioBands, updateSettings]
+  );
+
+  const handleAudioReset = useCallback(() => {
+    const flat: BandGains = { low: 0, mid: 0, high: 0 };
+    updateSettings({ audioPreset: 'off', audioBands: flat });
+    audioGestureAllowedRef.current = true;
+    void ensureAudioEnhancer()?.reset();
+    setAudioNotice(null);
+  }, [ensureAudioEnhancer, updateSettings]);
+
+  // Re-apply a saved preset once the element exists and a gesture happened.
+  useEffect(() => {
+    if (!audioGestureAllowedRef.current) return;
+    void applyAudioPreset(settings.audioPreset, settings.audioBands);
+    // Only when the saved values change; gestures drive the first apply.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.audioPreset, settings.audioBands.low, settings.audioBands.mid, settings.audioBands.high]);
+
+  useEffect(() => {
+    return () => {
+      audioEnhancerRef.current?.dispose();
+      audioEnhancerRef.current = null;
+    };
+  }, []);
 
   // --- Real screen rotation (Screen Orientation API, Phase 2.3) ---
   const [rotateScreenNotice, setRotateScreenNotice] = useState<string | null>(null);
@@ -346,9 +423,23 @@ export const VideoPlayer: React.FC = () => {
   // first, as required by Android Chrome / installed PWAs). On any rejection
   // or missing support we show the truthful fallback message instead of
   // pretending the screen rotated.
+  const rotationInFlightRef = useRef(false);
   const rotateScreen = useCallback(async () => {
-    const result = await requestScreenRotation(enterPlayerFullscreen, getScreenOrientation());
-    if (result === 'fallback') showRotateScreenNotice(ROTATE_SCREEN_FALLBACK_MESSAGE);
+    // Single-flight: repeated taps while a rotation is in progress must never
+    // stack fullscreen/lock requests (that is what caused orientation loops).
+    if (rotationInFlightRef.current) return;
+    rotationInFlightRef.current = true;
+    try {
+      const result = await requestScreenRotation(enterPlayerFullscreen, getScreenOrientation());
+      if (result === 'fallback') {
+        showRotateScreenNotice(ROTATE_SCREEN_FALLBACK_MESSAGE);
+      } else {
+        // Real rotation happened: clear any stale fallback notice.
+        setRotateScreenNotice(null);
+      }
+    } finally {
+      rotationInFlightRef.current = false;
+    }
   }, [enterPlayerFullscreen, showRotateScreenNotice]);
 
   // Listen to fullscreen changes
@@ -377,6 +468,8 @@ export const VideoPlayer: React.FC = () => {
 
     if (video.paused) {
       setPlaybackError(null);
+      // A tap on play is a valid gesture: safe to start audio processing now.
+      audioGestureAllowedRef.current = true;
       const playPromise = video.play();
       if (playPromise !== undefined) {
         playPromise
@@ -1149,7 +1242,16 @@ export const VideoPlayer: React.FC = () => {
         onResetOrientation={() => applyOrientation(resetOrientationState())}
         onPrevTrack={prevTrack}
         onNextTrack={nextTrack}
-        onOpenSubtitles={() => setShowSubtitlesModal(true)}
+        audioPreset={settings.audioPreset}
+        audioBands={settings.audioBands}
+        audioNotice={audioNotice}
+        onSetAudioPreset={handleAudioPresetChange}
+        onSetAudioBand={handleAudioBandChange}
+        onResetAudio={handleAudioReset}
+        onOpenSubtitles={() => {
+          setControlsVisible(true);
+          setShowSubtitlesModal((prev) => !prev);
+        }}
         onOpenPlaylist={() => setShowPlaylistDrawer(true)}
         onOpenShortcuts={() => setShowShortcutsModal(true)}
       />

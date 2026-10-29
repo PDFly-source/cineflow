@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { DISPLAY_MODES, displayModeOption, displayModeToVideoFit, videoFitToDisplayMode, ZOOM_MIN, ZOOM_MAX } from '@/lib/player/display-modes';
+import { AUDIO_PRESETS, MIN_BAND_GAIN_DB, MAX_BAND_GAIN_DB, AUDIO_BANDS, type AudioPresetId, type BandGains } from '@/lib/audio/presets';
 import {
   Play,
   Pause,
@@ -13,6 +14,7 @@ import {
   Scaling,
   ZoomIn,
   ZoomOut,
+  SlidersHorizontal,
   Volume2,
   Volume1,
   VolumeX,
@@ -111,6 +113,13 @@ interface ControlsOverlayProps {
   onPrevTrack: () => void;
   onNextTrack: () => void;
   onOpenSubtitles: () => void;
+  /** Fix 4: local audio clarity controls. */
+  audioPreset: AudioPresetId;
+  audioBands: BandGains;
+  audioNotice: string | null;
+  onSetAudioPreset: (id: AudioPresetId) => void;
+  onSetAudioBand: (band: keyof BandGains, db: number) => void;
+  onResetAudio: () => void;
   onOpenPlaylist: () => void;
   onOpenShortcuts: () => void;
 }
@@ -205,6 +214,12 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   onPrevTrack,
   onNextTrack,
   onOpenSubtitles,
+  audioPreset,
+  audioBands,
+  audioNotice,
+  onSetAudioPreset,
+  onSetAudioBand,
+  onResetAudio,
   onOpenPlaylist,
   onOpenShortcuts,
 }) => {
@@ -214,6 +229,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showFitMenu, setShowFitMenu] = useState(false);
   const [displayMenuOpen, setDisplayMenuOpen] = useState(false);
+  const [audioMenuOpen, setAudioMenuOpen] = useState(false);
   const [showSleepMenu, setShowSleepMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showABMenu, setShowABMenu] = useState(false);
@@ -395,6 +411,91 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
           >
             <Smartphone className="w-4 h-4" />
           </button>
+
+          {/* Audio clarity (Fix 4): local, preset-based, with a safe reset */}
+          <div className="relative">
+            <button
+              onClick={() => setAudioMenuOpen((v) => !v)}
+              title={`Audio clarity: ${AUDIO_PRESETS.find((p) => p.id === audioPreset)?.label ?? 'Off'}`}
+              aria-label="Audio clarity and equalizer"
+              aria-expanded={audioMenuOpen}
+              className={`rnd gl text-white hover:border-[var(--bv)] ${
+                audioPreset !== 'off' ? 'border-[var(--cy)]' : ''
+              }`}
+            >
+              <SlidersHorizontal className={`w-4 h-4 ${audioPreset !== 'off' ? 'text-[var(--cy)]' : 'text-slate-400'}`} />
+            </button>
+            {audioMenuOpen && (
+              <div
+                className="absolute top-12 right-0 z-20 w-64 rounded-2xl border border-[var(--bd)] bg-[var(--es)]/95 backdrop-blur-xl p-2 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+                role="group"
+                aria-label="Audio clarity presets"
+              >
+                <p className="px-2 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--t3)]">
+                  Audio clarity (on this device)
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {AUDIO_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      onClick={() => onSetAudioPreset(preset.id)}
+                      aria-pressed={audioPreset === preset.id}
+                      title={preset.description}
+                      className={`chip gl text-[11px] h-9 px-2 justify-center ${
+                        audioPreset === preset.id ? 'text-[var(--cy)] border-[var(--cy)]' : 'text-white'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="px-2 pt-2 pb-1 text-[10px] leading-relaxed text-[var(--t3)]">
+                  {AUDIO_PRESETS.find((p) => p.id === audioPreset)?.description ??
+                    'Custom curve applied locally.'}
+                </p>
+                <p className="px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--t3)]">
+                  Custom bands (dB)
+                </p>
+                <div className="space-y-1 px-1 pb-1">
+                  {AUDIO_BANDS.map((band) => (
+                    <label key={band} className="flex items-center gap-2 text-[10px] font-semibold text-[var(--t2)] capitalize">
+                      <span className="w-8">{band}</span>
+                      <input
+                        type="range"
+                        min={MIN_BAND_GAIN_DB}
+                        max={MAX_BAND_GAIN_DB}
+                        step={1}
+                        value={audioBands[band]}
+                        onChange={(e) => onSetAudioBand(band, Number(e.target.value))}
+                        className="flex-1 accent-[var(--cy)]"
+                        aria-label={`${band} band gain in decibels`}
+                      />
+                      <span className="w-9 text-right font-mono text-[var(--cy)]">
+                        {audioBands[band] > 0 ? '+' : ''}
+                        {audioBands[band]}
+                      </span>
+                    </label>
+                  ))}
+                  <button
+                    onClick={onResetAudio}
+                    className="chip gl text-white text-[11px] h-8 w-full justify-center mt-1"
+                    aria-label="Reset audio to original, unprocessed sound"
+                  >
+                    Reset audio
+                  </button>
+                  <p className="pt-1 text-[10px] leading-relaxed text-[var(--t3)]">
+                    Local processing only. Equalizer gain is capped so it cannot exceed your device volume.
+                  </p>
+                </div>
+                {audioNotice && (
+                  <p className="mt-1 rounded-lg bg-[var(--es)] px-2 py-1.5 text-[10px] leading-relaxed text-[var(--lav)]" role="status">
+                    {audioNotice}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Display modes & zoom (MX Player-style sheet) */}
           <div className="relative">

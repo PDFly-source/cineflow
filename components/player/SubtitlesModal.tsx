@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
-import { X, Upload, RotateCcw, Check, Type, FileText, AlertCircle } from 'lucide-react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { Upload, RotateCcw, Check, Type, FileText, AlertCircle } from 'lucide-react';
 import { useMedia } from '@/context/MediaSessionContext';
 import { parseSubtitleFile } from '@/lib/subtitles/parser';
 import { SubtitleSize } from '@/lib/storage/db';
@@ -31,8 +31,50 @@ export const SubtitlesModal: React.FC<SubtitlesModalProps> = ({ isOpen, onClose 
   } = useMedia();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCheckingFile, setIsCheckingFile] = useState(false);
+
+  // Fix 3: focus moves into the studio when it opens and returns to whatever
+  // opened it (the CC button) when it closes. Escape closes; Android back
+  // (popstate) closes too, so the panel can never trap the user.
+  useEffect(() => {
+    if (!isOpen) return;
+    const previouslyFocused =
+      typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+    const focusTimer = setTimeout(() => {
+      panelRef.current?.focus({ preventScroll: true });
+    }, 30);
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+
+    let historyPushed = false;
+    try {
+      window.history.pushState({ cineflowSubtitleStudio: true }, '');
+      historyPushed = true;
+    } catch {
+      historyPushed = false;
+    }
+    const onPopState = () => onClose();
+    if (historyPushed) window.addEventListener('popstate', onPopState);
+
+    return () => {
+      clearTimeout(focusTimer);
+      document.removeEventListener('keydown', onKeyDown, true);
+      if (historyPushed) window.removeEventListener('popstate', onPopState);
+      previouslyFocused?.focus?.({ preventScroll: true });
+    };
+  }, [isOpen, onClose]);
+
+  const handleBackdropDismiss = useCallback(() => {
+    onClose();
+  }, [onClose]);
 
   if (!isOpen) return null;
 
@@ -99,12 +141,24 @@ export const SubtitlesModal: React.FC<SubtitlesModalProps> = ({ isOpen, onClose 
   const bgOpacityPct = Math.round((settings.subtitleBgOpacity ?? 0.65) * 100);
 
   return (
-    <div
-      className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto"
-      onClick={onClose}
-    >
+    <>
+      {/* Fix 3: no full-screen veil — the player's navigation bar stays
+          visible and usable while the studio is open. This transparent
+          click-catcher stops above the control strip. */}
       <div
-        className="relative w-full max-w-md max-h-[calc(100dvh-2rem)] rounded-[32px] bg-[var(--es)] border border-[var(--bd)] shadow-2xl text-[var(--tx)] my-auto select-none overflow-y-auto overscroll-contain"
+        className="absolute inset-x-0 top-0 bottom-[88px] z-50"
+        onClick={handleBackdropDismiss}
+        aria-hidden="true"
+        data-testid="subtitle-studio-backdrop"
+      />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="false"
+        aria-label="Subtitle Studio"
+        tabIndex={-1}
+        data-testid="subtitle-studio-panel"
+        className="absolute right-0 left-0 sm:left-auto bottom-[88px] sm:bottom-[92px] z-50 mx-auto sm:mx-0 w-full sm:w-[420px] max-h-[min(78dvh,620px)] rounded-t-[28px] sm:rounded-[28px] bg-[var(--es)]/97 backdrop-blur-xl border border-[var(--bd)] shadow-2xl text-[var(--tx)] select-none overflow-y-auto overscroll-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bv)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Hidden Subtitle File Input */}
@@ -125,16 +179,11 @@ export const SubtitlesModal: React.FC<SubtitlesModalProps> = ({ isOpen, onClose 
           <div className="flex items-center gap-3">
             <button
               onClick={handleResetSettings}
-              className="text-xs font-bold text-[var(--lav)] hover:text-white transition-colors"
+              className="text-xs font-bold text-[var(--lav)] hover:text-white transition-colors rounded-lg px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bv)]"
+              aria-label="Reset subtitle settings to defaults"
+              title="Reset subtitle settings only, the studio stays open"
             >
               Reset
-            </button>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="rnd gl w-8 h-8 text-[var(--t2)] hover:text-white"
-            >
-              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -325,8 +374,24 @@ export const SubtitlesModal: React.FC<SubtitlesModalProps> = ({ isOpen, onClose 
             </div>
           </div>
         </div>
+
+        {/* Dismiss affordances: CC toggles, Escape works, and this explicit
+            Done button is the accessible fallback (no X icon). */}
+        <div className="sticky bottom-0 -mx-5 mt-2 px-5 pb-4 pt-3 bg-gradient-to-t from-[var(--es)] via-[var(--es)]/95 to-transparent">
+          <button
+            onClick={onClose}
+            className="btn pri w-full h-11 text-sm font-bold"
+            aria-label="Done, close Subtitle Studio and return to the player"
+          >
+            <Check className="w-4 h-4" />
+            <span>Done</span>
+          </button>
+          <p className="mt-2 text-center text-[10px] text-[var(--t3)]">
+            Tap CC again, press Escape, or press Done to close. Player controls stay available.
+          </p>
+        </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

@@ -1,3 +1,4 @@
+import type { AudioPresetId, BandGains } from '@/lib/audio/presets';
 export interface PlaybackRecord {
   id: string; // mediaKey: `${name}_${size}_${lastModified}`
   fileName: string;
@@ -97,6 +98,10 @@ export interface UserSettings {
   subtitleTextShadow: boolean;
   playerProfile: PlayerProfile;
   confirmBeforeClearing: boolean;
+  /** Fix 4: local audio clarity preset (off = untouched audio). */
+  audioPreset: AudioPresetId;
+  /** Fix 4: custom 3-band curve in dB, stored locally only. */
+  audioBands: BandGains;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -129,6 +134,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   subtitleTextShadow: true,
   playerProfile: 'movie',
   confirmBeforeClearing: true,
+  audioPreset: 'off',
+  audioBands: { low: 0, mid: 0, high: 0 },
 };
 
 export const DB_NAME = 'cineflow_db';
