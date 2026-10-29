@@ -39,6 +39,7 @@ import {
   GraduationCap,
   Clock,
   Check,
+  Square,
 } from 'lucide-react';
 import { formatTime, formatVideoTitle } from '@/lib/utils/formatters';
 import { type VideoOrientation } from '@/lib/player/orientation';
@@ -630,6 +631,19 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
         </div>
       </div>
 
+      {/* Restore: one tap returns picture framing to default (reference centre button) */}
+      <div className={`flex justify-center ${isVisible ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+        <button
+          type="button"
+          onClick={() => { onResetZoom(); onResetOrientation(); }}
+          className="rounded-full border border-white/15 bg-black/45 px-4 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-md transition hover:border-white/35 hover:bg-black/60 active:scale-95"
+          aria-label="Restore default picture framing"
+          data-testid="player-restore"
+        >
+          Restore
+        </button>
+      </div>
+
       {/* Center Controls (Screen 2: Skip Back, Big Play, Skip Forward) */}
       <div
         onPointerDown={(e) => e.stopPropagation()}
@@ -642,7 +656,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
           className="rnd gl text-white hover:scale-105 active:scale-95 transition-transform"
           title={`-${seekInterval}s`}
         >
-          <RotateCcw className="w-5 h-5" />
+          <RotateCcw className="w-6 h-6 sm:w-7 sm:h-7" />
         </button>
 
         {/* Big Circular Play Button (Screen 2: bigp) */}
@@ -652,9 +666,9 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
           className="bigp focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
           {isPlaying ? (
-            <Pause className="w-7 h-7 text-white fill-white" />
+            <Pause className="w-8 h-8 text-white fill-white" />
           ) : (
-            <Play className="w-7 h-7 text-white fill-white ml-1" />
+            <Play className="w-8 h-8 text-white fill-white ml-1" />
           )}
         </button>
 
@@ -664,7 +678,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
           className="rnd gl text-white hover:scale-105 active:scale-95 transition-transform"
           title={`+${seekInterval}s`}
         >
-          <RotateCw className="w-5 h-5" />
+          <RotateCw className="w-6 h-6 sm:w-7 sm:h-7" />
         </button>
       </div>
 
@@ -674,7 +688,11 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
         onClick={(e) => e.stopPropagation()}
         className={`${isVisible ? "pointer-events-auto" : "pointer-events-none"} flex flex-col gap-3 select-none`}
       >
-        {/* Scrubber Timeline (Screen 2: .sl with cyan-to-violet gradient) */}
+        {/* Scrubber flanked by timestamps, as in the reference layout */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <span className="shrink-0 font-mono text-[11px] sm:text-xs tabular-nums text-white/90" data-testid="player-current-time">
+            {formatTime(currentTime)}
+          </span>
         <div
           ref={scrubBarRef}
           onMouseMove={handleScrubMouseMove}
@@ -763,16 +781,14 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
             </div>
           )}
         </div>
+          <span className="shrink-0 font-mono text-[11px] sm:text-xs tabular-nums text-white/60" data-testid="player-duration">
+            {formatTime(duration)}
+          </span>
+        </div>
 
         {/* Control Buttons Row */}
         <div className="flex items-center justify-between gap-3 text-xs font-semibold text-[var(--t2)]">
-          {/* Time: 12:41 / 36:08 */}
-          <div className="font-mono text-xs sm:text-sm text-[var(--tx)]">
-            <span>{formatTime(currentTime)}</span>
-            <span className="text-[var(--t3)] mx-1">/</span>
-            <span className="text-[var(--t2)]">{formatTime(duration)}</span>
-          </div>
-
+          {/* Timestamps live beside the scrubber now, so this row starts with its actions */}
           <div className="flex-1" />
 
           {/* Speed Chip (Screen 2: chip gl '1.25x') */}
@@ -845,6 +861,32 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
               <PictureInPicture2 className="w-4 h-4" />
             </button>
           )}
+
+          {/* Rotate screen directly (Fix 2): one tap asks the device for landscape */}
+          <button
+            onClick={onRotateScreen}
+            className="rnd gl text-white hover:border-[var(--bv)]"
+            title="Rotate screen to landscape"
+            aria-label="Rotate screen"
+            data-testid="player-rotate-screen"
+          >
+            <Smartphone className="w-5 h-5" />
+          </button>
+
+          {/* Fit / aspect ratio cycle, next to rotation as in the reference bar */}
+          <button
+            onClick={() => {
+              const order: VideoFitMode[] = ['contain', 'cover', 'fill', 'original', 'crop'];
+              const next = order[(order.indexOf(fitMode) + 1) % order.length];
+              onChangeFitMode(next);
+            }}
+            className="rnd gl text-white hover:border-[var(--bv)]"
+            title={`Aspect: ${fitMode}`}
+            aria-label={`Aspect ratio: ${fitMode}`}
+            data-testid="player-aspect"
+          >
+            <Square className="w-4 h-4" />
+          </button>
 
           {/* Fullscreen Button (Screen 2: rnd gl) */}
           <button
