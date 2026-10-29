@@ -19,6 +19,7 @@ import {
 } from '@/lib/storage/db';
 import { formatTime, formatFileSize, formatDate, formatVideoTitle } from '@/lib/utils/formatters';
 import { filterLibraryRecords, getRecordTitle } from '@/lib/library/filters';
+import { splitLibrarySections, sectionCaption } from '@/lib/library/sections';
 import { useMedia } from '@/context/MediaSessionContext';
 import { EmptyStateCard } from '@/components/ui/EmptyStateCard';
 import { VideoLibraryItem } from '@/components/library/VideoLibraryItem';
@@ -103,6 +104,17 @@ export default function LibraryPage() {
     searchQuery,
     sortOrder,
   });
+
+  // Fix 1: separate short-form clips from longer videos by ACTUAL duration.
+  const { shorts, videos } = splitLibrarySections(filteredRecords);
+
+  // Shorts use the SAME open path as videos: the browser cannot re-open a
+  // previously picked file without the user re-selecting it (local-first, no
+  // hidden file handles), so a tap hands off to the file picker exactly like
+  // a video row does. Nothing is re-uploaded and no record is duplicated.
+  const openShort = () => {
+    fileInputRef.current?.click();
+  };
 
   return (
     <div className="flex-1 flex flex-col max-w-4xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 nav-clearance">
@@ -211,16 +223,87 @@ export default function LibraryPage() {
           </button>
         </div>
       ) : (
-        <div className="divide-y divide-[var(--bd)] rounded-2xl bg-[var(--es)] border border-[var(--bd)] overflow-hidden">
-          {filteredRecords.map((item) => (
-            <VideoLibraryItem
-              key={item.id}
-              record={item}
-              onOpen={() => fileInputRef.current?.click()}
-              onOpenMenu={(r) => setSheetRecord(r)}
-              onToggleFavorite={handleToggleFavorite}
-            />
-          ))}
+        <div className="space-y-6">
+          {shorts.length > 0 && (
+            <section aria-labelledby="library-shorts-heading" className="space-y-2.5">
+              <div className="flex items-baseline justify-between gap-3 px-0.5">
+                <h2 id="library-shorts-heading" className="text-sm sm:text-base font-extrabold tracking-tight text-white">
+                  Shorts
+                  <span className="ml-2 rounded-full bg-[var(--es)] border border-[var(--bd)] px-2 py-0.5 text-[10px] font-bold text-[var(--t2)] align-middle">
+                    {shorts.length}
+                  </span>
+                </h2>
+                <span className="text-[10px] sm:text-[11px] text-[var(--t3)]">{sectionCaption('shorts')}</span>
+              </div>
+              <ul
+                className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar snap-x snap-mandatory"
+                aria-label={`${shorts.length} short clips`}
+              >
+                {shorts.map((item) => (
+                  <li key={item.id} className="snap-start shrink-0 w-[132px] sm:w-[148px]">
+                    <div className="relative rounded-2xl border border-[var(--bd)] bg-[var(--es)] overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => openShort()}
+                        className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bv)] rounded-2xl"
+                        aria-label={`Play short ${getRecordTitle(item)} (${formatTime(item.duration)}) — re-select the file to play`}
+                        title="Re-select the file to play (files never leave your device)"
+                      >
+                        <div className="relative aspect-[9/16] bg-black/60 grid place-items-center">
+                          <Film className="w-6 h-6 text-[var(--cy)]/70" aria-hidden="true" />
+                          <span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/75 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
+                            {formatTime(item.duration)}
+                          </span>
+                          {item.isFavorite && (
+                            <span className="absolute top-1.5 left-1.5 text-[10px] font-bold text-[var(--cy)]">★</span>
+                          )}
+                        </div>
+                        <div className="px-2 py-2">
+                          <p className="truncate text-[11px] font-bold text-white" title={getRecordTitle(item)}>
+                            {getRecordTitle(item)}
+                          </p>
+                          <p className="truncate text-[10px] text-[var(--t3)]">Short · {formatFileSize(item.fileSize)}</p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSheetRecord(item)}
+                        className="absolute top-1.5 right-1.5 grid h-7 w-7 place-items-center rounded-full bg-black/65 text-white text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bv)]"
+                        aria-label={`More options for ${getRecordTitle(item)}`}
+                      >
+                        ⋯
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {videos.length > 0 && (
+            <section aria-labelledby="library-videos-heading" className="space-y-2.5">
+              <div className="flex items-baseline justify-between gap-3 px-0.5">
+                <h2 id="library-videos-heading" className="text-sm sm:text-base font-extrabold tracking-tight text-white">
+                  Videos
+                  <span className="ml-2 rounded-full bg-[var(--es)] border border-[var(--bd)] px-2 py-0.5 text-[10px] font-bold text-[var(--t2)] align-middle">
+                    {videos.length}
+                  </span>
+                </h2>
+                <span className="text-[10px] sm:text-[11px] text-[var(--t3)]">{sectionCaption('videos')}</span>
+              </div>
+              <div className="divide-y divide-[var(--bd)] rounded-2xl bg-[var(--es)] border border-[var(--bd)] overflow-hidden">
+                {videos.map((item) => (
+                  <VideoLibraryItem
+                    key={item.id}
+                    record={item}
+                    onOpen={() => fileInputRef.current?.click()}
+                    onOpenMenu={(r) => setSheetRecord(r)}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
 
