@@ -1,3 +1,30 @@
+# CineFlow v0.2.5
+
+## Launcher icon rebuilt so the brand actually survives Android's launcher
+0.2.4 shipped the complete lockup inside the APK and still looked like the symbol
+alone on a phone. That was a real failure, and this release fixes the cause.
+
+- **Root cause.** The lockup is a three-element stack: symbol, a 5.4:1 wordmark and
+  a 37:1 single-line tagline. Android's adaptive icon only guarantees the central
+  66/108 circle, so the builder fitted the whole stack's diagonal into that circle:
+  the artwork ended up occupying 41.7% of the tile and the tagline rendered about
+  1.3px at a 144px launcher tile. Present in the file, invisible on the device.
+- **Fix.** The launcher icon is now a purpose-built composition, built from the
+  approved artwork's own pixels by `scripts/build_launcher_icon.py`. Nothing is
+  redrawn: the symbol, the wordmark and the three tagline words are cropped out of
+  `cineflow-icon-lockup-512.png` and re-laid so the tagline stacks one word per
+  line, which turns a 37:1 line into three ~7:1 lines.
+- **Measured result at launcher size,** adaptive icon: symbol 14.1px, wordmark
+  11.1px, tagline glyphs 7.4px at a 144px (48dp xxhdpi) tile, versus 9.7px and
+  1.3px before. Legacy square icon at 192px: tagline glyphs 21.8px.
+- **Honest limit.** At the smallest 48px density the tagline glyphs are 5.4px: the
+  words are present and shaped correctly but not readable. Below roughly 96px of
+  tile the tagline is decoration, not text. The wordmark stays readable throughout.
+- Release notes and the marketplace artwork are unchanged; this is an icon-only
+  change plus the shell cache bump to `cineflow-shell-v5`.
+
+---
+
 # CineFlow v0.2.4
 
 ## Android launcher icon now carries the complete brand lockup
