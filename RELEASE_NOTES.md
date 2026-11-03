@@ -1,3 +1,29 @@
+# CineFlow v0.2.4
+
+## Android launcher icon now carries the complete brand lockup
+- The Android launcher icon is generated from the approved full-lockup
+  artwork — the film-strip "C" with its play mark, the Cineflow wordmark and the
+  **PRIVATE · CINEMA · CONTROL** tagline in one square composition. This
+  replaces the symbol-only launcher icon that shipped in 0.2.3.
+- The same artwork is now versioned in the app repository at
+  `public/brand/cineflow-icon-lockup-512.png`, byte-identical to the asset
+  approved and live on the AppMintly marketplace, so the launcher icon and the
+  store artwork can never drift apart.
+- Adaptive icon (Android 8+): the complete lockup is fitted by its bounding-box
+  diagonal inside the 66/108 safe circle, so circular, squircle and
+  rounded-square launcher masks keep every element whole — no crop, no zoom.
+- Honest limitation, measured rather than assumed: the tagline is a single line
+  at 2.1% of the artwork height. Inside a 48dp launcher tile it renders about
+  1px tall, so it is present and uncropped but not legible at launcher size.
+  The wordmark is legible. The lockup is fully legible in the app's own splash
+  and About surfaces, which is where the tagline is meant to be read.
+- No functional change: playback, library, playlists, subtitles, MP3
+  conversion, device-to-device transfer and local-first storage are untouched.
+- Service-worker shell cache bumped to `cineflow-shell-v4` so installed clients
+  pick up the new build.
+
+---
+
 # CineFlow v0.2.3
 
 ## New official brand identity
