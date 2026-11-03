@@ -32,6 +32,7 @@ import {
 } from '@/lib/transfer/p2p';
 import { formatFileSize, formatTime } from '@/lib/utils/formatters';
 import packageInfo from '@/package.json';
+import { CineFlowLogo } from '@/components/brand/Logo';
 
 export default function MorePage() {
   const [showTransfer, setShowTransfer] = useState(false);
@@ -244,6 +245,11 @@ export default function MorePage() {
       <section aria-labelledby="more-about">
         <h2 id="more-about" className="sec-h">About</h2>
         <div className="rounded-2xl border border-[var(--bd)] bg-[var(--ss)] p-4 space-y-2">
+          {/* Official brand lockup: complete composition, never cropped, with
+              the tagline held well inside the card on narrow screens. */}
+          <div className="mx-auto w-[min(80%,280px)] overflow-hidden rounded-2xl bg-white p-1">
+            <CineFlowLogo className="w-full" />
+          </div>
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-[var(--t3)]" />
             <p className="text-xs font-semibold text-white">CineFlow v{packageInfo.version}</p>

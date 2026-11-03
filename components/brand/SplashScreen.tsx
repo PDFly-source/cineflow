@@ -72,11 +72,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         }, 200);
       }}
     >
-      <div className="flex w-full max-w-sm flex-col items-center justify-center gap-8 text-center">
-        <CineFlowLogo className="h-40 w-40 rounded-[28px] shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_90px_rgba(105,85,255,0.28)] sm:h-44 sm:w-44" />
-        <p className="text-xs sm:text-sm font-extrabold tracking-[0.22em] text-[var(--t2)] uppercase pt-4">
-          YOUR VIDEOS. YOUR DEVICE. YOUR CONTROL.
-        </p>
+      <div className="flex w-full max-w-sm flex-col items-center justify-center px-2 text-center">
+        {/* Full official lockup — mark, wordmark and tagline in one artwork.
+            The container caps width so the tagline keeps a safe margin from
+            both screen edges on narrow Android viewports (>=360px). */}
+        <div className="w-[min(78vw,300px)] overflow-hidden rounded-[26px] bg-white shadow-[0_0_0_1px_rgba(255,255,255,0.10),0_18px_60px_rgba(3,7,18,0.55),0_0_90px_rgba(105,85,255,0.26)]">
+          <CineFlowLogo className="w-full" priority />
+        </div>
       </div>
     </aside>
   );
