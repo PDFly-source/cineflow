@@ -1,3 +1,31 @@
+# CineFlow v0.2.6
+
+## Launcher icon: the supplied logo, unmodified
+
+v0.2.5 rebuilt the launcher artwork to make the tagline readable — it re-laid
+PRIVATE · CINEMA · CONTROL onto three lines. The owner rejected that: the supplied
+logo is the single source of truth and must not be rearranged. This release
+reverses it.
+
+- **The icon is the supplied artwork.** `public/brand/cineflow-launcher-1024.png` is
+  generated from `brand-source/cineflow-logo-original.png` (the 1254x1254 master) by
+  `scripts/build_launcher_icon.py`, which does exactly two things: find the artwork's
+  ink box, and scale it uniformly into a 1024 canvas with even padding on a plate
+  sampled from the original's own background (`#FBFCFC`).
+- **Nothing is redrawn, recoloured, cropped, stretched or rearranged.** Symbol,
+  wordmark with its blue-cyan-purple gradients, and the single-line tagline keep
+  their original geometry. Content aspect 0.991 against 0.992 in the source.
+- **Kept inside Android's adaptive safe zone.** The artwork occupies 38.7% of the
+  tile, which is what the 66/108 safe circle allows a square composition.
+- **Honest limit.** At launcher size the tagline is a thin line, not readable text:
+  0.4px at 48dp, 1.3px at 144dp, 1.8px on the 192px legacy icon. Legible taglines
+  and an unmodified 37:1 line cannot coexist in a square icon; fidelity was chosen
+  deliberately.
+- Same composition in standard, round and adaptive resources. Web app unchanged
+  apart from the `cineflow-shell-v6` cache bump.
+
+---
+
 # CineFlow v0.2.5
 
 ## Launcher icon rebuilt so the brand actually survives Android's launcher

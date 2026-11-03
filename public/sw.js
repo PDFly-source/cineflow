@@ -1,5 +1,5 @@
 const BASE_PATH = '/cineflow';
-const CACHE_NAME = 'cineflow-shell-v5';
+const CACHE_NAME = 'cineflow-shell-v6';
 const PRECACHE_ASSETS = [
   `${BASE_PATH}/`,
   `${BASE_PATH}/player/`,
