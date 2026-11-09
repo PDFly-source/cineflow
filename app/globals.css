@@ -440,3 +440,28 @@ svg.i {
   display: inline-block;
   cursor: pointer;
 }
+
+/* ── Brand splash (owner-approved artwork) ───────────────────────────────────
+   Mirrors the reference sheet exactly: light gradient ground, two scrolling
+   film strips, mark flipping in on the Y axis, wordmark rising 900ms later. */
+.cfs-root{position:fixed;inset:0;z-index:9999;overflow:hidden;isolation:isolate;transition:opacity .35s ease}
+.cfs-root.is-fading{opacity:0}
+.cfs-a6{background:linear-gradient(160deg,#f5f7ff,#ede8ff)}
+.cfs-root>*{position:absolute}
+.cfs-ctr{inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding-bottom:44px;perspective:700px}
+.cfs-ctr img{display:block;mix-blend-mode:multiply;max-width:100%;height:auto}
+.cfs-fs{left:0;right:0;height:26px;background:#141a4a}
+.cfs-fs:before{content:"";position:absolute;left:0;right:0;top:9px;height:8px;background:repeating-linear-gradient(90deg,#eef0ff 0 10px,transparent 10px 20px);animation:cfs-scroll 1.2s linear infinite}
+.cfs-f1{top:66px;transform-origin:left}
+.cfs-f2{bottom:66px;transform-origin:right}
+.cfs-f2:before{animation-direction:reverse}
+.cfs-go .cfs-fs{animation:cfs-sx 1s cubic-bezier(.2,.8,.2,1) both}
+.cfs-go .cfs-mk{animation:cfs-flip 1.1s cubic-bezier(.2,.8,.2,1) .35s both}
+.cfs-go .cfs-tx{animation:cfs-rise .8s ease .9s both}
+@keyframes cfs-scroll{to{background-position-x:20px}}
+@keyframes cfs-sx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes cfs-flip{from{opacity:0;transform:rotateY(-80deg) scale(.8)}to{opacity:1;transform:none}}
+@keyframes cfs-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){
+  .cfs-go .cfs-fs,.cfs-go .cfs-mk,.cfs-go .cfs-tx,.cfs-fs:before{animation-duration:.01ms;animation-iteration-count:1}
+}

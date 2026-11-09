@@ -1,16 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CineFlowLogo } from './Logo';
 
 interface SplashScreenProps {
   onComplete?: () => void;
   autoDismissMs?: number;
 }
 
+/**
+ * Brand splash - artwork approved by the owner: film strips frame the screen,
+ * the mark turns in 3D, the wordmark rises. The sequence lands at ~1.7s, so the
+ * default hold is 1900ms.
+ */
 export const SplashScreen: React.FC<SplashScreenProps> = ({
   onComplete,
-  autoDismissMs = 1200,
+  autoDismissMs = 1900,
 }) => {
   // Start hidden on both server and client so hydration always matches the
   // static export's HTML; decide whether to show in a post-mount effect.
@@ -23,7 +27,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
     try {
       alreadyShown = !!sessionStorage.getItem('cineflow_splash_shown');
     } catch {
-      // Private mode / storage disabled — skip the splash rather than loop it.
+      // Private mode / storage disabled - skip the splash rather than loop it.
       alreadyShown = true;
     }
     if (alreadyShown) return;
@@ -35,19 +39,16 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   useEffect(() => {
     if (!isVisible) return;
 
-    const fadeTimer = setTimeout(() => {
-      setIsFading(true);
-    }, autoDismissMs);
-
+    const fadeTimer = setTimeout(() => setIsFading(true), autoDismissMs);
     const closeTimer = setTimeout(() => {
       setIsVisible(false);
       try {
         sessionStorage.setItem('cineflow_splash_shown', 'true');
       } catch {
-        // Ignore quota/private mode restrictions
+        // Storage unavailable - the splash simply reappears next load.
       }
       onComplete?.();
-    }, autoDismissMs + 400);
+    }, autoDismissMs + 350);
 
     return () => {
       clearTimeout(fadeTimer);
@@ -58,28 +59,19 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   if (!isVisible) return null;
 
   return (
-    <aside
-      aria-label="CineFlow Launch Screen"
-      className={`fixed inset-0 z-50 flex w-screen flex-col items-center justify-center overflow-hidden bg-[var(--ob)] p-6 transition-opacity duration-400 select-none ${
-        isFading ? 'opacity-0 pointer-events-none' : 'opacity-100'
-      }`}
-      onClick={() => {
-        setIsFading(true);
-        setTimeout(() => {
-          setIsVisible(false);
-          sessionStorage.setItem('cineflow_splash_shown', 'true');
-          onComplete?.();
-        }, 200);
-      }}
+    <div
+      className={`cfs-root cfs-a6 cfs-go${isFading ? ' is-fading' : ''}`}
+      aria-hidden="true"
+      data-splash="cineflow"
     >
-      <div className="flex w-full max-w-sm flex-col items-center justify-center px-2 text-center">
-        {/* Full official lockup — mark, wordmark and tagline in one artwork.
-            The container caps width so the tagline keeps a safe margin from
-            both screen edges on narrow Android viewports (>=360px). */}
-        <div className="w-[min(78vw,300px)] overflow-hidden rounded-[26px] bg-white shadow-[0_0_0_1px_rgba(255,255,255,0.10),0_18px_60px_rgba(3,7,18,0.55),0_0_90px_rgba(105,85,255,0.26)]">
-          <CineFlowLogo className="w-full" priority />
-        </div>
+      <div className="cfs-fs cfs-f1" />
+      <div className="cfs-fs cfs-f2" />
+      <div className="cfs-ctr">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="cfs-mk" src="/brand/splash/mark.jpg" alt="" width={135} height={135} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="cfs-tx" src="/brand/splash/wordmark.jpg" alt="Cineflow" width={215} height={48} />
       </div>
-    </aside>
+    </div>
   );
 };
