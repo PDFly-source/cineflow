@@ -100,16 +100,20 @@ describe('v0.2.3 official brand lockup', () => {
   });
 
   test('no call site forces a square box onto the lockup', () => {
-    // `h-40 w-40` on the lockup was the v0.2.2 shape; a square frame on a
-    // 1238x1089 artwork distorts the wordmark and the tagline.
-    for (const rel of ['components/brand/SplashScreen.tsx', 'app/more/page.tsx']) {
-      const src = readFileSync(join(root, rel), 'utf8');
-      const usage = src.split('\n').filter((l) => l.includes('<CineFlowLogo'));
-      assert.ok(usage.length > 0, rel + ' must render the official lockup');
-      for (const line of usage) {
-        assert.ok(!/\bh-\d+\s+w-\d+\b/.test(line), rel + ' sizes the lockup with a fixed square: ' + line.trim());
-      }
+    // The splash now renders the owner-approved artwork sheet (mark + wordmark
+    // images) instead of <CineFlowLogo>, so the lockup rule applies to the
+    // remaining call site and the splash is checked for its own assets.
+    const more = readFileSync(join(root, 'app/more/page.tsx'), 'utf8');
+    const usage = more.split('\n').filter((l) => l.includes('<CineFlowLogo'));
+    assert.ok(usage.length > 0, 'app/more/page.tsx must render the official lockup');
+    for (const line of usage) {
+      assert.ok(!/\bh-\d+\s+w-\d+\b/.test(line), 'app/more/page.tsx sizes the lockup with a fixed square: ' + line.trim());
     }
+
+    const splash = readFileSync(join(root, 'components/brand/SplashScreen.tsx'), 'utf8');
+    assert.ok(splash.includes('/brand/splash/mark.jpg'), 'splash must render the approved mark');
+    assert.ok(splash.includes('/brand/splash/wordmark.jpg'), 'splash must render the approved wordmark');
+    assert.ok(!/\bh-\d+\s+w-\d+\b/.test(splash), 'splash must not force a fixed square onto the artwork');
   });
 
   test('every icon source is the mark only — no wordmark or tagline inside a tile', () => {
