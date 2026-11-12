@@ -113,6 +113,12 @@ describe('v0.2.3 official brand lockup', () => {
     const splash = readFileSync(join(root, 'components/brand/SplashScreen.tsx'), 'utf8');
     assert.ok(splash.includes('/brand/splash/mark.jpg'), 'splash must render the approved mark');
     assert.ok(splash.includes('/brand/splash/wordmark.jpg'), 'splash must render the approved wordmark');
+    // served from a project path: the URLs must carry the /cineflow base path
+    assert.ok(
+      splash.includes('${BASE_PATH}/brand/splash/mark.jpg') &&
+        splash.includes('${BASE_PATH}/brand/splash/wordmark.jpg'),
+      'splash artwork must resolve through NEXT_PUBLIC_BASE_PATH',
+    );
     assert.ok(!/\bh-\d+\s+w-\d+\b/.test(splash), 'splash must not force a fixed square onto the artwork');
   });
 

@@ -4,7 +4,7 @@ import { MediaProvider } from '@/context/MediaSessionContext';
 import { Navbar } from '@/components/app-shell/Navbar';
 import { SignatureFooter } from '@/components/app-shell/SignatureFooter';
 import { BottomPillNav } from '@/components/navigation/BottomPillNav';
-import { SplashScreen } from '@/components/brand/SplashScreen';
+import { SplashScreenMount } from '@/components/brand/SplashScreenMount';
 import { ServiceWorkerRegistrar } from '@/components/app-shell/ServiceWorkerRegistrar';
 
 export const viewport: Viewport = {
@@ -54,7 +54,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className="min-h-screen bg-[var(--ob)] text-[var(--tx)] antialiased selection:bg-[var(--ev)] selection:text-white flex flex-col font-sans">
         <MediaProvider>
-          <SplashScreen />
+          <SplashScreenMount />
           <Navbar />
           <main className="flex-1 flex flex-col">{children}</main>
           <SignatureFooter />

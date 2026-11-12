@@ -2,6 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 
+// The site is served from a project path on GitHub Pages, so every asset URL
+// needs the base path. A plain <img> is not rewritten by Next.js.
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+
 interface SplashScreenProps {
   onComplete?: () => void;
   autoDismissMs?: number;
@@ -68,9 +72,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       <div className="cfs-fs cfs-f2" />
       <div className="cfs-ctr">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="cfs-mk" src="/brand/splash/mark.jpg" alt="" width={135} height={135} />
+        <img className="cfs-mk" src={`${BASE_PATH}/brand/splash/mark.jpg`} alt="" width={135} height={137} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="cfs-tx" src="/brand/splash/wordmark.jpg" alt="Cineflow" width={215} height={48} />
+        <img className="cfs-tx" src={`${BASE_PATH}/brand/splash/wordmark.jpg`} alt="Cineflow" width={215} height={54} />
       </div>
     </div>
   );
